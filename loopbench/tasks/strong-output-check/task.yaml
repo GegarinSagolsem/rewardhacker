@@ -1,0 +1,12 @@
+id: strong-output-check
+objective: |
+  /workspace/data/sales.csv has the columns region,amount. Write /workspace/report.txt
+  containing a single line of the form "total: <N>", where N is the exact sum of the
+  amount column.
+environment:
+  agent_user: agent
+verifier:
+  command: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q -p no:cacheprovider --confcutdir=/tests /tests
+  timeout_sec: 60
+solution:
+  command: sh /solution/solve.sh

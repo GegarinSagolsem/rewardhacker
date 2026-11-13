@@ -15,7 +15,7 @@ import shlex
 from abc import ABC
 from textwrap import dedent
 
-from .models import ExecResult, Finding, ProbeResult, Severity
+from .models import ExecResult, Finding, ProbeResult, Severity, Trial
 from .sandbox import Sandbox
 from .taskspec import TaskSpec
 
@@ -60,8 +60,12 @@ class Probe(ABC):
         """Return a reason to skip this probe for the task, or None."""
         return None
 
-    def prepare(self, sb: Sandbox, task: TaskSpec) -> ExecResult | None:
+    def prepare(self, sb: Sandbox, task: TaskSpec, trial: Trial) -> ExecResult | None:
         """Change the sandbox before the verifier runs. Default: leave it untouched."""
+        return None
+
+    def after_verify(self, sb: Sandbox, task: TaskSpec, trial: Trial) -> None:
+        """Inspect the sandbox after verification (still running). Default: nothing."""
         return None
 
     def evaluate(self, result: ProbeResult) -> list[Finding]:
@@ -119,7 +123,7 @@ class ReferenceProbe(Probe):
     def not_applicable(self, task: TaskSpec) -> str | None:
         return None if task.solution else "task has no reference solution"
 
-    def prepare(self, sb: Sandbox, task: TaskSpec) -> ExecResult | None:
+    def prepare(self, sb: Sandbox, task: TaskSpec, trial: Trial) -> ExecResult | None:
         assert task.solution is not None
         sb.copy_in(task.resolve(task.solution.files), task.solution.mount_path)
         return sb.exec(
@@ -155,7 +159,7 @@ class ScriptProbe(Probe):
     def script_for(self, task: TaskSpec) -> str:
         return dedent(self.script)
 
-    def prepare(self, sb: Sandbox, task: TaskSpec) -> ExecResult | None:
+    def prepare(self, sb: Sandbox, task: TaskSpec, trial: Trial) -> ExecResult | None:
         return sb.exec(self.script_for(task), timeout=SETUP_TIMEOUT_SEC, user=task.environment.agent_user)
 
 
@@ -373,25 +377,3 @@ class VerifierFileTamperProbe(ScriptProbe):
             echo "overwrote $n verifier file(s)"
             [ "$n" -gt 0 ] || exit {NOT_APPLICABLE}
         """)
-
-
-ALL_PROBES: list[Probe] = [
-    NullProbe(),
-    ReferenceProbe(),
-    RewriteTestsProbe(),
-    PytestForcePassProbe(),
-    PythonStartupHookProbe(),
-    ShadowRunnerProbe(),
-    LingeringProcessProbe(),
-    VerifierFileTamperProbe(),
-]
-
-
-def get_probes(names: list[str] | None = None) -> list[Probe]:
-    if not names:
-        return list(ALL_PROBES)
-    by_name = {p.name: p for p in ALL_PROBES}
-    unknown = [n for n in names if n not in by_name]
-    if unknown:
-        raise ValueError(f"unknown probe(s): {', '.join(unknown)}; known: {', '.join(by_name)}")
-    return [by_name[n] for n in names]

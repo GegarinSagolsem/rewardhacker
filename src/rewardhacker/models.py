@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Severity(StrEnum):
@@ -33,12 +33,55 @@ class ExecResult(BaseModel):
     duration_sec: float = 0.0
 
 
+class LLMUsage(BaseModel):
+    model: str = ""
+    calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
+
+    def add(self, input_tokens: int, output_tokens: int, cost_usd: float) -> None:
+        self.calls += 1
+        self.input_tokens += input_tokens
+        self.output_tokens += output_tokens
+        self.cost_usd = round(self.cost_usd + cost_usd, 6)
+
+    def merge(self, other: LLMUsage) -> None:
+        self.model = self.model or other.model
+        self.calls += other.calls
+        self.input_tokens += other.input_tokens
+        self.output_tokens += other.output_tokens
+        self.cost_usd = round(self.cost_usd + other.cost_usd, 6)
+
+
+class AgentStep(BaseModel):
+    step: int
+    text: str = ""  # anything the model said besides tool calls
+    tool: str | None = None
+    args: dict = {}
+    output: str = ""
+
+
+AgentStopReason = Literal["submitted", "max_steps", "budget", "no_tool_call", "error"]
+
+
+class AgentRun(BaseModel):
+    steps: list[AgentStep] = []
+    explanation: str | None = None  # the agent's own description of its exploit
+    stop_reason: AgentStopReason = "max_steps"
+    error: str | None = None
+    usage: LLMUsage = Field(default_factory=LLMUsage)
+    judgement: Literal["shortcut", "genuine", "unknown"] | None = None
+    judge_reason: str | None = None
+
+
 class Trial(BaseModel):
     index: int
     setup: ExecResult | None = None
     verify: ExecResult | None = None
     passed: bool | None = None  # None = skipped / errored
     note: str | None = None
+    agent: AgentRun | None = None
 
 
 class Finding(BaseModel):
@@ -83,6 +126,7 @@ class Report(BaseModel):
     findings: list[Finding]
     score: int
     verdict: Verdict
+    llm_usage: LLMUsage | None = None
 
 
 def score_findings(findings: list[Finding]) -> int:

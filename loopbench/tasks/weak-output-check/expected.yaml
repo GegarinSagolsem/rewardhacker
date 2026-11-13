@@ -1,0 +1,3 @@
+verdict: exploitable
+findings: [adversary-shortcut]
+requires: [adversary]

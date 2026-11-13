@@ -12,7 +12,7 @@ from rich.table import Table
 
 from . import __version__
 from .models import Report, Severity
-from .probes import ALL_PROBES
+from .registry import ALL_PROBES, STATIC_PROBES
 from .runner import probe_task
 from .sandbox import DockerError
 from .taskspec import TaskSpec, TaskSpecError
@@ -99,6 +99,27 @@ def render(report: Report) -> None:
                 border_style=style,
             )
         )
+    for p in report.probes:
+        for t in p.trials:
+            if t.agent:
+                a = t.agent
+                lines = [f"[dim]{len(a.steps)} step(s), stopped: {a.stop_reason}[/dim]"]
+                for st in a.steps:
+                    if st.tool == "bash":
+                        lines.append(f"[cyan]$[/cyan] {st.args.get('command', '')}")
+                if a.explanation:
+                    lines.append(f"[bold]Agent says:[/bold] {a.explanation}")
+                if a.judgement:
+                    lines.append(f"[bold]Judge:[/bold] {a.judgement} - {a.judge_reason or ''}")
+                if a.error:
+                    lines.append(f"[red]{a.error}[/red]")
+                console.print(Panel("\n".join(lines), title="Adversary trace", title_align="left"))
+    if report.llm_usage:
+        u = report.llm_usage
+        console.print(
+            f"[dim]LLM: {u.model}, {u.calls} call(s), {u.input_tokens} in / {u.output_tokens} out tokens, "
+            f"${u.cost_usd:.4f}[/dim]"
+        )
     style = VERDICT_STYLE[report.verdict]
     console.print(
         f"Verdict: [{style}]{report.verdict.upper()}[/]   Score: [bold]{report.score}/100[/bold]"
@@ -117,6 +138,7 @@ def probe(
     ] = None,
     trials: Annotated[int | None, typer.Option(min=1, max=20, help="Override trials per probe")] = None,
     fail_under: Annotated[int | None, typer.Option(help="Exit 1 if the score is below this (for CI)")] = None,
+    no_llm: Annotated[bool, typer.Option("--no-llm", help="Skip LLM probes (no API cost)")] = False,
 ) -> None:
     """Red-team a task: run every probe and report how its reward can be gamed."""
     task = _load(path)
@@ -129,6 +151,8 @@ def probe(
             console.print(f"[dim]  probe {data['probe']}: {data['title']}[/dim]")
 
     try:
+        if no_llm and not names:
+            names = [p.name for p in STATIC_PROBES]
         report = probe_task(task, names, trials, on_event)
     except (DockerError, ValueError) as exc:
         console.print(f"[red]Error:[/red] {exc}")
@@ -150,18 +174,22 @@ def bench(
     path: Annotated[Path, typer.Argument(help="Directory of benchmark tasks")] = Path("loopbench/tasks"),
     jobs: Annotated[int, typer.Option(min=1, max=16, help="Tasks to probe in parallel")] = 4,
     json_out: Annotated[Path | None, typer.Option("--json", help="Write results as JSON")] = None,
+    adversary: Annotated[str, typer.Option(help="LLM adversary: off | required | all")] = "required",
 ) -> None:
     """Run LoopBench: probe tasks with known problems and report precision / recall."""
+    if adversary not in ("off", "required", "all"):
+        raise typer.BadParameter("--adversary must be off, required or all")
     import json
 
     from .bench import run_bench
 
     def on_done(o) -> None:
-        mark = "[green]PASS[/green]" if o.correct else "[red]FAIL[/red]"
-        console.print(f"  {mark} {o.task_id}" + (f" [red]{o.error}[/red]" if o.error else ""))
+        mark = "[dim]SKIP[/dim]" if o.skipped else "[green]PASS[/green]" if o.correct else "[red]FAIL[/red]"
+        extra = f" [red]{o.error}[/red]" if o.error else f" [dim]{o.skipped}[/dim]" if o.skipped else ""
+        console.print(f"  {mark} {o.task_id}{extra}")
 
     console.print(f"[dim]Running LoopBench on {path} with {jobs} parallel job(s)...[/dim]")
-    result = run_bench(path, jobs=jobs, on_done=on_done)
+    result = run_bench(path, jobs=jobs, adversary=adversary, on_done=on_done)
 
     table = Table("task", "expected", "got", "missed", "false alarms")
     for o in sorted(result.outcomes, key=lambda o: o.task_id):
@@ -180,6 +208,7 @@ def bench(
         f"Tasks fully correct: [bold]{s['tasks_fully_correct']}/{s['tasks']}[/bold]   "
         f"Verdict accuracy: [bold]{s['verdict_accuracy']:.0%}[/bold]   "
         f"Precision: [bold]{s['precision']:.0%}[/bold]   Recall: [bold]{s['recall']:.0%}[/bold]"
+        + (f"   [dim]Skipped: {s['tasks_skipped']}[/dim]" if s["tasks_skipped"] else "")
     )
     if json_out:
         payload = {

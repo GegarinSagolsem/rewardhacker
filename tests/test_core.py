@@ -12,7 +12,8 @@ from rewardhacker.models import (
     score_findings,
     verdict_for,
 )
-from rewardhacker.probes import NullProbe, ReferenceProbe, get_probes
+from rewardhacker.probes import NullProbe, ReferenceProbe
+from rewardhacker.registry import get_probes
 from rewardhacker.taskspec import TaskSpec, TaskSpecError
 
 BENCH = Path(__file__).resolve().parents[1] / "loopbench" / "tasks"
@@ -107,7 +108,8 @@ def test_scoring_and_verdicts():
 
 
 def test_get_probes():
-    assert len(get_probes()) == 8
+    assert len(get_probes()) == 9
+    assert len(get_probes(include_llm=False)) == 8
     assert [p.name for p in get_probes(["null"])] == ["null"]
     with pytest.raises(ValueError, match="unknown"):
         get_probes(["nope"])

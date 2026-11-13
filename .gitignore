@@ -8,3 +8,5 @@ dist/
 .env.*
 *.report.json
 node_modules/
+!.env.example
+PRIVATE_NOTES.md

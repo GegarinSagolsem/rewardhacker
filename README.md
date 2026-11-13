@@ -32,7 +32,7 @@ would have.
 
 ### The most important finding so far
 
-If the agent runs as **root**, no verifier inside the same container can be trusted — not
+If the agent runs as **root**, no verifier inside the same container can be trusted â€” not
 even one that follows the usual advice (`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`, `--confcutdir`,
 `python -m pytest`, tests copied in at verification time). A `.pth` startup hook defeats
 `python -I`, and a lingering background process can rewrite tests after they arrive.
@@ -48,7 +48,7 @@ finding with a concrete fix for every problem.
 Requires Python 3.11+, [uv](https://docs.astral.sh/uv/) and Docker.
 
 ```bash
-uv sync
+uv sync --all-extras          # --all-extras adds the Gemini SDK for the adversary probe
 uv run rh probe loopbench/tasks/bare-pytest-runner
 uv run rh probe path/to/your-task --json report.json   # exit code 1 if not robust (CI-friendly)
 uv run rh bench                                        # run LoopBench, report precision/recall
@@ -89,7 +89,7 @@ must **not** be flagged. `rh bench` probes them all and reports precision and re
 
 Current result: 10/10 tasks correct, precision 100%, recall 100% (stable across repeated
 runs). Caveat: these tasks were written alongside the probes, so this measures that each
-probe works as designed — not how well RewardHacker finds problems nobody anticipated. That
+probe works as designed â€” not how well RewardHacker finds problems nobody anticipated. That
 is what the LLM adversary probe and runs on public benchmarks are for.
 
 ## License
