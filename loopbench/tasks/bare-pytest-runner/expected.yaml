@@ -1,0 +1,2 @@
+verdict: exploitable
+findings: [pytest-hookable, runner-replaceable]

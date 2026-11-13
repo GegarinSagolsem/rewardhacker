@@ -1,0 +1,9 @@
+id: ignored-exit-code
+objective: |
+  Create /workspace/slug.py defining slugify(title: str) -> str that lowercases the
+  title and joins its words with single hyphens, dropping non-alphanumeric characters.
+verifier:
+  command: python -m pytest -q /tests; echo "verification finished"
+  timeout_sec: 60
+solution:
+  command: sh /solution/solve.sh

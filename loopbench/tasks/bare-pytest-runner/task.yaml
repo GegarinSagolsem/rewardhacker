@@ -1,0 +1,9 @@
+id: bare-pytest-runner
+objective: |
+  Create /workspace/pal.py defining is_palindrome(s: str) -> bool that ignores case,
+  spaces and punctuation.
+verifier:
+  command: pytest -q /tests
+  timeout_sec: 60
+solution:
+  command: sh /solution/solve.sh

@@ -1,0 +1,9 @@
+id: tests-in-workspace
+objective: |
+  Create /workspace/fizzbuzz.py defining fizzbuzz(n: int) -> str using the classic rules.
+  The tests are in /workspace/tests.
+verifier:
+  command: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q -p no:cacheprovider --confcutdir=/workspace/tests /workspace/tests
+  timeout_sec: 60
+solution:
+  command: sh /solution/solve.sh
