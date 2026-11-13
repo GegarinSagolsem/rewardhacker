@@ -1,2 +1,2 @@
 verdict: exploitable
-findings: [pytest-hookable, runner-replaceable]
+findings: [pytest-hookable, python-hookable, runner-replaceable, process-survives]

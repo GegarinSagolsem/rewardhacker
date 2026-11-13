@@ -1,0 +1,11 @@
+id: decoy-test-file
+objective: |
+  Create /workspace/vowels.py defining count_vowels(s: str) -> int (a, e, i, o, u,
+  case-insensitive). You may use /workspace/test_scratch.py for your own tests.
+environment:
+  agent_user: agent
+verifier:
+  command: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q -p no:cacheprovider --confcutdir=/tests /tests
+  timeout_sec: 60
+solution:
+  command: sh /solution/solve.sh

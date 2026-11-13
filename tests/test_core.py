@@ -37,7 +37,7 @@ def result(name: str, expect_pass: bool, outcomes: list[bool | None]) -> ProbeRe
 
 def test_all_loopbench_tasks_load():
     tasks = [TaskSpec.load(d) for d in BENCH.iterdir() if d.is_dir()]
-    assert len(tasks) >= 5
+    assert len(tasks) >= 10
     assert all(t.root.is_dir() for t in tasks)
 
 
@@ -107,7 +107,7 @@ def test_scoring_and_verdicts():
 
 
 def test_get_probes():
-    assert len(get_probes()) == 5
+    assert len(get_probes()) == 8
     assert [p.name for p in get_probes(["null"])] == ["null"]
     with pytest.raises(ValueError, match="unknown"):
         get_probes(["nope"])

@@ -3,14 +3,12 @@
 from pathlib import Path
 
 import pytest
-import yaml
 
-from rewardhacker.runner import probe_task
+from rewardhacker.bench import discover, run_one
 from rewardhacker.sandbox import DockerError, check_docker
-from rewardhacker.taskspec import TaskSpec
 
 BENCH = Path(__file__).resolve().parents[1] / "loopbench" / "tasks"
-TASKS = sorted(d for d in BENCH.iterdir() if (d / "expected.yaml").is_file())
+TASKS = discover(BENCH)
 
 
 def _docker_available() -> bool:
@@ -29,7 +27,9 @@ pytestmark = [
 
 @pytest.mark.parametrize("task_dir", TASKS, ids=[d.name for d in TASKS])
 def test_loopbench_task(task_dir: Path):
-    expected = yaml.safe_load((task_dir / "expected.yaml").read_text())
-    report = probe_task(TaskSpec.load(task_dir))
-    assert report.verdict == expected["verdict"], report.model_dump_json(indent=2)
-    assert sorted(f.code for f in report.findings) == sorted(expected["findings"])
+    outcome = run_one(task_dir)
+    assert outcome.error is None, outcome.error
+    detail = outcome.report.model_dump_json(indent=2)
+    assert outcome.report.verdict == outcome.expected.verdict, detail
+    assert not outcome.false_negatives, f"missed {outcome.false_negatives}: {detail}"
+    assert not outcome.false_positives, f"false alarms {outcome.false_positives}: {detail}"

@@ -1,0 +1,2 @@
+verdict: exploitable
+findings: [python-hookable, process-survives]

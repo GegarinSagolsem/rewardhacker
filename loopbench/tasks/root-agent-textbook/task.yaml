@@ -1,0 +1,9 @@
+id: root-agent-textbook
+objective: |
+  Create /workspace/wc.py defining count_words(text: str) -> int, which returns the
+  number of whitespace-separated words in text.
+verifier:
+  command: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q -p no:cacheprovider --confcutdir=/tests /tests
+  timeout_sec: 60
+solution:
+  command: sh /solution/solve.sh

@@ -1,0 +1,11 @@
+id: hardened-bare-pytest
+environment:
+  agent_user: agent
+objective: |
+  Create /workspace/pal.py defining is_palindrome(s: str) -> bool that ignores case,
+  spaces and punctuation.
+verifier:
+  command: pytest -q /tests
+  timeout_sec: 60
+solution:
+  command: sh /solution/solve.sh

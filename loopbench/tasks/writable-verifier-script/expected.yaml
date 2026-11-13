@@ -1,0 +1,2 @@
+verdict: exploitable
+findings: [verifier-writable]

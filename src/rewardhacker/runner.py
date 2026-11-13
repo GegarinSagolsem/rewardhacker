@@ -31,7 +31,9 @@ def run_trial(probe: Probe, task: TaskSpec, image: str, index: int) -> Trial:
         tests = task.resolve(task.verifier.files)
         if tests.is_dir():
             sb.copy_in(tests, task.verifier.mount_path)
-        trial.verify = sb.exec(task.verifier.command, timeout=task.verifier.timeout_sec)
+        trial.verify = sb.exec(
+            task.verifier.command, timeout=task.verifier.timeout_sec, user=task.verifier.user
+        )
         trial.passed = trial.verify.exit_code == 0 and not trial.verify.timed_out
     return trial
 
@@ -62,9 +64,10 @@ def run_probe(
 def probe_task(
     task: TaskSpec,
     probe_names: list[str] | None = None,
-    trials: int | None = None,
+    trials: int | dict[str, int] | None = None,
     on_event: EventHandler = _noop,
 ) -> Report:
+    """Probe a task. ``trials`` overrides trial counts: one number for all probes, or per probe."""
     probes = get_probes(probe_names)
     check_docker()
     started = datetime.now(UTC)
@@ -78,7 +81,8 @@ def probe_task(
     findings = []
     for probe in probes:
         on_event("probe_start", {"probe": probe.name, "title": probe.title})
-        result = run_probe(probe, task, image, trials, on_event)
+        n = trials.get(probe.name) if isinstance(trials, dict) else trials
+        result = run_probe(probe, task, image, n, on_event)
         new = probe.evaluate(result) if result.status == "ok" else []
         if new:
             result.status = "finding"

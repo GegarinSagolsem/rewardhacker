@@ -1,0 +1,11 @@
+id: flaky-reference
+objective: |
+  Create /workspace/dice.py defining roll() -> int that returns a uniformly random
+  integer from 1 to 6.
+environment:
+  agent_user: agent
+verifier:
+  command: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q -p no:cacheprovider --confcutdir=/tests /tests
+  timeout_sec: 60
+solution:
+  command: sh /solution/solve.sh

@@ -1,4 +1,6 @@
 id: tests-in-workspace
+environment:
+  agent_user: agent
 objective: |
   Create /workspace/fizzbuzz.py defining fizzbuzz(n: int) -> str using the classic rules.
   The tests are in /workspace/tests.

@@ -145,5 +145,60 @@ def probe(
         raise typer.Exit(1)
 
 
+@app.command()
+def bench(
+    path: Annotated[Path, typer.Argument(help="Directory of benchmark tasks")] = Path("loopbench/tasks"),
+    jobs: Annotated[int, typer.Option(min=1, max=16, help="Tasks to probe in parallel")] = 4,
+    json_out: Annotated[Path | None, typer.Option("--json", help="Write results as JSON")] = None,
+) -> None:
+    """Run LoopBench: probe tasks with known problems and report precision / recall."""
+    import json
+
+    from .bench import run_bench
+
+    def on_done(o) -> None:
+        mark = "[green]PASS[/green]" if o.correct else "[red]FAIL[/red]"
+        console.print(f"  {mark} {o.task_id}" + (f" [red]{o.error}[/red]" if o.error else ""))
+
+    console.print(f"[dim]Running LoopBench on {path} with {jobs} parallel job(s)...[/dim]")
+    result = run_bench(path, jobs=jobs, on_done=on_done)
+
+    table = Table("task", "expected", "got", "missed", "false alarms")
+    for o in sorted(result.outcomes, key=lambda o: o.task_id):
+        got = o.report.verdict if o.report else "error"
+        style = "green" if o.verdict_ok else "red"
+        table.add_row(
+            o.task_id,
+            o.expected.verdict,
+            f"[{style}]{got}[/]",
+            ", ".join(sorted(o.false_negatives)) or "-",
+            ", ".join(sorted(o.false_positives)) or "-",
+        )
+    console.print(table)
+    s = result.summary()
+    console.print(
+        f"Tasks fully correct: [bold]{s['tasks_fully_correct']}/{s['tasks']}[/bold]   "
+        f"Verdict accuracy: [bold]{s['verdict_accuracy']:.0%}[/bold]   "
+        f"Precision: [bold]{s['precision']:.0%}[/bold]   Recall: [bold]{s['recall']:.0%}[/bold]"
+    )
+    if json_out:
+        payload = {
+            "summary": s,
+            "tasks": [
+                {
+                    "task_id": o.task_id,
+                    "expected": o.expected.model_dump(),
+                    "verdict": o.report.verdict if o.report else None,
+                    "findings": sorted(o.found),
+                    "error": o.error,
+                }
+                for o in result.outcomes
+            ],
+        }
+        json_out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if s["tasks_fully_correct"] != s["tasks"]:
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

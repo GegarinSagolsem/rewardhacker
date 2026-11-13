@@ -132,7 +132,7 @@ class Sandbox:
         )
         self.started = True
         # Make sure the workdir exists even if the image did not create it.
-        self.exec(f"mkdir -p {self.task.environment.workdir}", timeout=30)
+        self.exec(f"mkdir -p {self.task.environment.workdir}", timeout=30, user="root")
         return self
 
     def __exit__(self, *exc) -> None:
@@ -141,14 +141,18 @@ class Sandbox:
 
     def copy_in(self, src: Path, dest: str) -> None:
         """Copy the *contents* of a host directory into ``dest`` inside the container."""
-        self.exec(f"mkdir -p '{dest}'", timeout=30)
+        self.exec(f"mkdir -p '{dest}'", timeout=30, user="root")
         docker("cp", f"{src}{'/' if src.is_dir() else ''}.", f"{self.name}:{dest}", timeout=120)
 
-    def exec(self, command: str, timeout: float) -> ExecResult:
+    def exec(self, command: str, timeout: float, user: str | None = None) -> ExecResult:
+        """Run ``sh -c command`` in the container, as ``user`` (default: the image's user)."""
+        args = ["docker", "exec", "-w", self.task.environment.workdir]
+        if user:
+            args += ["-u", user]
         start = time.monotonic()
         try:
             proc = subprocess.run(
-                ["docker", "exec", "-w", self.task.environment.workdir, self.name, "sh", "-c", command],
+                [*args, self.name, "sh", "-c", command],
                 capture_output=True,
                 text=True,
                 encoding="utf-8",

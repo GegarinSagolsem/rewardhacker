@@ -31,6 +31,9 @@ class Environment(_Strict):
     dockerfile: str = "environment/Dockerfile"
     context: str = "environment"
     workdir: str = "/workspace"
+    # User the agent (and the reference solution) runs as. None = the image's default user.
+    # Running the agent as an unprivileged user is the main defence against tampering.
+    agent_user: str | None = None
 
 
 class Verifier(_Strict):
@@ -38,6 +41,7 @@ class Verifier(_Strict):
     timeout_sec: int = Field(default=120, ge=1, le=3600)
     files: str = "tests"
     mount_path: str = "/tests"
+    user: str = "root"
 
 
 class Solution(_Strict):

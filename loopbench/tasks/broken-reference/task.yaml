@@ -1,4 +1,6 @@
 id: broken-reference
+environment:
+  agent_user: agent
 objective: |
   Create /workspace/temp.py defining c_to_f(celsius: float) -> float.
 verifier:
