@@ -26,6 +26,13 @@ review, after the fact. RewardHacker attacks every task automatically and tells 
 | `shadow-runner` | Can the agent overwrite `pytest`/`jest` on `PATH`? | fail |
 | `lingering-process` | Can a background process rewrite tests after they are copied in? | fail |
 | `verifier-file-tamper` | Can the agent edit a script the verifier command runs? | fail |
+| `adversary` | Can an LLM agent, told to cheat, find a task-specific shortcut? | fail |
+
+The `adversary` probe is a Gemini agent with a shell tool. It works black-box like a real
+agent — it sees the objective and the environment, never the hidden tests — and tries to earn
+the reward without solving the task. If the verifier passes, a separate judge call decides
+whether the work is genuine or a shortcut, so honest solutions are not reported as exploits.
+Spending is capped per run and per day; without an API key the probe is simply skipped.
 
 All probe actions run as the task's `agent_user`, i.e. with the same privileges a real agent
 would have.
