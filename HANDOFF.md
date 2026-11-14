@@ -17,17 +17,15 @@ _Last updated: 2026-11-14 (days 4–5 closed with live Gemini; day 6 not started
 
 ## Blocked on the user
 
-- **MongoDB Atlas auth fails** (`bad auth : authentication failed`; network reachable). The
-  user/password in `MONGODB_URI` don't match an Atlas database user. User to fix under
-  Atlas → Database & Network Access → Database Users. Re-check with a ping before day-6 Mongo work.
+- Nothing. All three services verified connecting on 2026-11-14 (Mongo server 8.0.37).
+  If Atlas times out later, the user's IP probably changed → Atlas Network Access.
 
 ## Next steps (in order)
 
-1. Re-verify Mongo connectivity once the user fixes credentials.
-2. Day 6: FastAPI backend — auth (JWT + hashed passwords), orgs + roles, task upload, runs,
+1. Day 6: FastAPI backend — auth (JWT + hashed passwords), orgs + roles, task upload, runs,
    Postgres-backed job queue (`SELECT … FOR UPDATE SKIP LOCKED`) + worker process that calls
    `runner.py`; SQLAlchemy + Alembic on Neon; agent traces → MongoDB.
-3. Keep tests DB-free where possible (SQLite / mongomock or fakes); don't hit Neon/Atlas in CI.
+2. Keep tests DB-free where possible (SQLite / mongomock or fakes); don't hit Neon/Atlas in CI.
 
 ## Open questions / risks
 
