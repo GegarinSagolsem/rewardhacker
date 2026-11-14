@@ -229,5 +229,43 @@ def bench(
         raise typer.Exit(1)
 
 
+def _require_api_extra() -> None:
+    try:
+        import fastapi  # noqa: F401
+        import sqlalchemy  # noqa: F401
+    except ImportError:
+        console.print("[red]The web backend needs the api extra:[/red] uv sync --extra api")
+        raise typer.Exit(2) from None
+
+
+@app.command()
+def serve(
+    host: Annotated[str, typer.Option(help="Interface to bind")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port")] = 8000,
+    reload: Annotated[bool, typer.Option(help="Auto-reload on code changes (dev)")] = False,
+) -> None:
+    """Run the web API (FastAPI). Docs at http://HOST:PORT/docs."""
+    _require_api_extra()
+    import uvicorn
+
+    uvicorn.run("rewardhacker.api.app:create_app", factory=True, host=host, port=port, reload=reload)
+
+
+@app.command()
+def worker(
+    once: Annotated[bool, typer.Option(help="Exit when the queue is empty")] = False,
+    poll: Annotated[float, typer.Option(help="Seconds between queue polls")] = 2.0,
+) -> None:
+    """Run the probe worker: executes queued runs from the database."""
+    _require_api_extra()
+    import logging
+
+    from .api.worker import run_worker
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    n = run_worker(once=once, poll_seconds=poll)
+    console.print(f"processed {n} run(s)")
+
+
 if __name__ == "__main__":
     app()

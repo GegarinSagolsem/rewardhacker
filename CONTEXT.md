@@ -42,7 +42,7 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
 | 1–2 | task.yaml, sandbox, null/reference/flaky probes, CLI | done 2026-11-13 |
 | 3 | tamper probes, LoopBench ~10 tasks, `rh bench` | done 2026-11-13 |
 | 4–5 | Gemini adversary + judge, spend caps | done 2026-11-14 (live: LoopBench 12/12) |
-| 6 | FastAPI backend: auth, orgs, roles, task upload, runs, job queue; traces → MongoDB | |
+| 6 | FastAPI backend: auth, orgs, roles, task upload, runs, job queue; traces → MongoDB | done 2026-11-14 |
 | 7–8 | React dashboard: reports, trace viewer, reviewer triage | |
 | 9 | GCS exports (signed URLs), audit log, API keys, RAG spec check vs guidelines | |
 | 10 | MCP server | |
@@ -76,3 +76,15 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
 - 2026-11-14 — Day-6 databases: Neon Postgres (AWS Singapore, PG 18) + MongoDB Atlas M0
   (cluster "Gegarin"), used from local dev too (user's choice over docker-compose). Env vars
   `DATABASE_URL`, `MONGODB_URI`.
+- 2026-11-14 — Day-6 backend design: JWT (HS256, `RH_JWT_SECRET`) + Argon2 (pwdlib); roles
+  viewer < reviewer < admin per org; non-members get 404 (no org enumeration); org must keep
+  one admin. Job queue = `runs` table claimed with `FOR UPDATE SKIP LOCKED` (no broker);
+  `recover_stale` requeues runs stuck >1h, fails after 3 attempts. Runs are static-only unless
+  `include_llm=true`. Adversary steps → Mongo `traces`; Postgres report keeps everything else;
+  if Mongo is down the steps stay inline in the report. Uploads = .zip, extracted with
+  zip-slip/symlink/bomb checks to local disk (GCS on day 9). Tests: SQLite + MemoryTraceStore.
+- 2026-11-14 — Live E2E (Neon + Atlas + Docker + Gemini): upload → queue → `rh worker --once`
+  → EXPLOITABLE, `adversary-shortcut`, trace in Atlas; $0.0016. Left one `e2e-*@example.com`
+  user + "E2E org" in Neon.
+- 2026-11-14 — Known risk: uploaded tasks' Dockerfiles are built on the worker (`docker build`
+  has network access). Acceptable for invited orgs; revisit before opening public sign-up.

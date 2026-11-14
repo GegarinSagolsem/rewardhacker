@@ -37,20 +37,38 @@ solution) and reports how the reward can be obtained without doing the work.
 | `runner.py` | Runs probes → `Report` (findings, score, verdict, LLM usage) |
 | `models.py` | Pydantic result types (shared with the future API) |
 | `bench.py` | LoopBench runner: precision / recall against `expected.yaml` |
-| `cli.py` | `rh probe`, `rh bench`, `rh validate`, `rh probes` |
+| `cli.py` | `rh probe`, `rh bench`, `rh validate`, `rh probes`, `rh serve`, `rh worker` |
+
+Web backend (`src/rewardhacker/api/`, needs the `api` extra):
+
+| File | Responsibility |
+|---|---|
+| `app.py` | `create_app(settings, engine, traces)` factory; routers in `routes/` (auth, orgs, tasks, runs) |
+| `tables.py` | SQLAlchemy models: User, Org, Membership (role), Task, Run (= job-queue row) |
+| `deps.py` | DB session, `current_user` (JWT), `require_role(Role.X)` org-scoped checks (404 for non-members) |
+| `jobs.py` | Queue: `claim_next` (FOR UPDATE SKIP LOCKED), `execute`, `recover_stale`, trace split |
+| `traces.py` | `MongoTraceStore` / `MemoryTraceStore` for adversary steps |
+| `storage.py` | Safe zip extraction for uploads (zip-slip, symlinks, bombs) |
+| `security.py`, `settings.py`, `db.py`, `schemas.py`, `worker.py` | hashing + JWT, env config, engine, I/O models, worker loop |
+
+`migrations/` = Alembic (reads `DATABASE_URL`). After changing `tables.py`:
+`uv run alembic revision --autogenerate -m "..."` then `uv run alembic upgrade head`.
 
 `loopbench/tasks/<task>/expected.yaml` = known answer for each benchmark task.
 `tests/fakes.py` = scripted `FakeLLM` + `FakeSandbox` (use these; never call a real LLM in tests).
+`tests/test_api.py` runs on SQLite + `MemoryTraceStore`; never touch Neon/Atlas from tests.
 
 ## Commands
 
 ```bash
 uv sync --all-extras                      # install (incl. google-genai)
 uv run ruff check . && uv run ruff format .
-uv run pytest tests/test_core.py tests/test_adversary.py -q   # fast, no Docker
+uv run pytest tests/test_core.py tests/test_adversary.py tests/test_api.py -q   # fast, no Docker
 uv run pytest tests/test_loopbench.py -q  # Docker end-to-end (~3 min)
 uv run rh probe loopbench/tasks/<task> [--no-llm] [--json out.json]
 uv run rh bench [--adversary off|required|all]
+uv run rh serve [--reload]                # API on :8000, docs at /docs (needs DATABASE_URL, RH_JWT_SECRET)
+uv run rh worker [--once]                 # executes queued runs (needs Docker)
 ```
 
 ## Rules
