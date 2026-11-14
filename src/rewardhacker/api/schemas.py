@@ -186,3 +186,10 @@ class SpecCheckOut(_Out):
     cost_usd: float
     result: dict
     created_at: datetime
+
+
+class KeyInfo(BaseModel):
+    org_id: str
+    org_name: str
+    name: str
+    role: Role

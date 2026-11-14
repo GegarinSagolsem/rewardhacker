@@ -83,10 +83,16 @@ class Principal:
         )
 
 
-def _from_api_key(db: Session, key: str, org_id: str) -> Principal:
+def resolve_api_key(db: Session, key: str) -> ApiKey:
+    """The active key row for a raw ``rh_`` key, or 401."""
     row = db.scalars(select(ApiKey).where(ApiKey.key_hash == hash_api_key(key))).first()
     if row is None or row.revoked_at is not None:
         raise _unauthorized()
+    return row
+
+
+def _from_api_key(db: Session, key: str, org_id: str) -> Principal:
+    row = resolve_api_key(db, key)
     if row.org_id != org_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "org not found")
     now, last = utcnow(), row.last_used_at

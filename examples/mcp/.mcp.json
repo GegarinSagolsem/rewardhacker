@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "rewardhacker": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/rewardhacker", "rh", "mcp"],
+      "env": {
+        "RH_API_URL": "http://127.0.0.1:8000",
+        "RH_API_KEY": "${RH_API_KEY}"
+      }
+    }
+  }
+}

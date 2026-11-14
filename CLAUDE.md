@@ -37,7 +37,9 @@ solution) and reports how the reward can be obtained without doing the work.
 | `runner.py` | Runs probes → `Report` (findings, score, verdict, LLM usage) |
 | `models.py` | Pydantic result types (shared with the future API) |
 | `bench.py` | LoopBench runner: precision / recall against `expected.yaml` |
-| `cli.py` | `rh probe`, `rh bench`, `rh validate`, `rh probes`, `rh serve`, `rh worker` |
+| `cli.py` | `rh probe`, `rh bench`, `rh validate`, `rh probes`, `rh serve`, `rh worker`, `rh mcp`, `rh setup-search` |
+| `mcp_server.py` | MCP server (stdio): thin REST client authenticated by an org API key; 10 tools; tested in-process in `tests/test_mcp.py` |
+| `reporting.py` | Markdown report renderer (exports + MCP `get_report`) |
 
 Web backend (`src/rewardhacker/api/`, needs the `api` extra):
 
@@ -75,7 +77,7 @@ Atlas vector index (`guideline_vectors`). Example guidelines: `examples/guidelin
 ```bash
 uv sync --all-extras                      # install (incl. google-genai)
 uv run ruff check . && uv run ruff format .
-uv run pytest tests/test_core.py tests/test_adversary.py tests/test_api.py tests/test_api_data.py -q  # fast
+uv run pytest tests/test_core.py tests/test_adversary.py tests/test_api.py tests/test_api_data.py tests/test_mcp.py -q  # fast
 uv run pytest tests/test_loopbench.py -q  # Docker end-to-end (~3 min)
 uv run rh probe loopbench/tasks/<task> [--no-llm] [--json out.json]
 uv run rh bench [--adversary off|required|all]

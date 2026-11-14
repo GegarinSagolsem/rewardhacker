@@ -267,6 +267,19 @@ def worker(
     console.print(f"processed {n} run(s)")
 
 
+@app.command("mcp")
+def mcp_cmd() -> None:
+    """Run the MCP server on stdio (for Claude Code / Claude Desktop). Needs RH_API_KEY."""
+    try:
+        import mcp  # noqa: F401
+    except ImportError:
+        console.print("[red]The MCP server needs the mcp extra:[/red] uv sync --extra mcp")
+        raise typer.Exit(2) from None
+    from .mcp_server import main
+
+    main()
+
+
 @app.command("setup-search")
 def setup_search() -> None:
     """Create the MongoDB Atlas Vector Search index used by guideline retrieval (idempotent)."""

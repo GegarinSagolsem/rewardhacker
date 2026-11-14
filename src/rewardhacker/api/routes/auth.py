@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..deps import current_user, get_db
-from ..schemas import Credentials, MeOut, OrgOut, Token, UserOut
+from ..deps import API_KEY_PREFIX, current_user, get_db, resolve_api_key
+from ..deps import _bearer as bearer
+from ..schemas import Credentials, KeyInfo, MeOut, OrgOut, Token, UserOut
 from ..security import create_token, hash_password, verify_password
-from ..tables import Membership, Org, User
+from ..tables import Membership, Org, Role, User
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -44,3 +46,15 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> MeO
     ).all()
     orgs = [OrgOut(id=o.id, name=o.name, created_at=o.created_at, role=role) for o, role in rows]
     return MeOut(id=user.id, email=user.email, created_at=user.created_at, orgs=orgs)
+
+
+@router.get("/key", response_model=KeyInfo)
+def key_info(
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer), db: Session = Depends(get_db)
+) -> KeyInfo:
+    """For API-key callers (CI, the MCP server): which org and role does this key act as?"""
+    if creds is None or not creds.credentials.startswith(API_KEY_PREFIX):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "send an org API key (rh_...) as a Bearer token")
+    row = resolve_api_key(db, creds.credentials)
+    org = db.get(Org, row.org_id)
+    return KeyInfo(org_id=row.org_id, org_name=org.name if org else "", name=row.name, role=Role(row.role))

@@ -30,6 +30,9 @@ api = [
 gcs = [
     "google-cloud-storage>=2.18",
 ]
+mcp = [
+    "mcp>=1.9",
+]
 
 [project.scripts]
 rh = "rewardhacker.cli:app"

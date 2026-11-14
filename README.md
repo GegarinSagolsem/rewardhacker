@@ -90,14 +90,47 @@ trial.
 
 ## LoopBench
 
-`loopbench/tasks/` holds 10 tasks with known answers: hardened tasks with exactly one
-deliberate flaw each, two "naive" root-agent tasks, and clean tasks (including decoys) that
-must **not** be flagged. `rh bench` probes them all and reports precision and recall.
+`loopbench/tasks/` holds 12 tasks with known answers: hardened tasks with exactly one
+deliberate flaw each, two "naive" root-agent tasks, clean tasks (including decoys) that must
+**not** be flagged, and two output-check tasks for the LLM adversary. `rh bench` probes them all
+and reports precision and recall.
 
-Current result: 10/10 tasks correct, precision 100%, recall 100% (stable across repeated
-runs). Caveat: these tasks were written alongside the probes, so this measures that each
-probe works as designed — not how well RewardHacker finds problems nobody anticipated. That
-is what the LLM adversary probe and runs on public benchmarks are for.
+Current result: 12/12 tasks correct with the live Gemini adversary, precision 100%, recall
+100%. Caveat: these tasks were written alongside the probes, so this measures that each probe
+works as designed, not how well RewardHacker finds problems nobody anticipated. That is what
+the LLM adversary and runs on public benchmarks are for.
+
+## Web app
+
+`rh serve` runs a FastAPI backend (PostgreSQL + MongoDB) and `web/` is a React dashboard:
+organizations with viewer / reviewer / admin roles, task upload, a Postgres-backed job queue
+executed by `rh worker`, reports with the adversary's full trace, CSV / JSONL / Markdown
+exports, org API keys, an audit log, and a **guideline check** that retrieves the relevant
+sections of your team's written task guidelines (Gemini embeddings + Atlas Vector Search) and
+asks an LLM which ones a task breaks.
+
+## MCP server
+
+`rh mcp` exposes RewardHacker to AI assistants over the Model Context Protocol, so an agent
+can write a task, probe it, read the findings and fix it in one loop. It authenticates with an
+org API key and goes through the same role checks and audit log as the dashboard.
+
+Tools: `whoami`, `list_tasks`, `validate_task`, `upload_task`, `get_task`, `start_run` (waits
+for the verdict), `list_runs`, `get_run`, `get_report`, `check_guidelines`.
+
+Claude Code (`.mcp.json` in your project; see `examples/mcp/`):
+
+```json
+{
+  "mcpServers": {
+    "rewardhacker": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/rewardhacker", "rh", "mcp"],
+      "env": { "RH_API_URL": "http://127.0.0.1:8000", "RH_API_KEY": "${RH_API_KEY}" }
+    }
+  }
+}
+```
 
 ## License
 

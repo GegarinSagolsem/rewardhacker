@@ -45,7 +45,7 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
 | 6 | FastAPI backend: auth, orgs, roles, task upload, runs, job queue; traces → MongoDB | done 2026-11-14 |
 | 7–8 | React dashboard: reports, trace viewer, reviewer triage | done 2026-11-14 (triage deferred) |
 | 9 | GCS exports (signed URLs), audit log, API keys, RAG spec check vs guidelines | done 2026-11-14 (GCS path unverified until deploy) |
-| 10 | MCP server | |
+| 10 | MCP server | done 2026-11-15 |
 | 11–12 | GCP deploy, CI/CD, observability | |
 | 13 | LoopBench complete; run on public benchmarks; write up results | |
 | 14 | README, demo video, go public | |
@@ -111,3 +111,14 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
   test); strong-output-check (probes: ROBUST) → hard-coded expected total matches visible data
   (breaks "include an unseen case"): the spec check catches things the probes can't. ~$0.0005
   per check. Example guidelines in `examples/guidelines/` (written for this project).
+- 2026-11-15 — MCP server (`rh mcp`, stdio) built on the official Python SDK **v2** (`mcp>=1.9`
+  resolved to 2.3: `FastMCP` is now `mcp.server.mcpserver.MCPServer`, client is `mcp.Client`).
+  Design: thin REST client with an org API key (new `GET /api/auth/key` tells it its org/role),
+  so roles + audit log apply unchanged; 10 tools return Markdown; task refs accept full id,
+  8-char prefix or task.yaml id. Tests drive the real protocol in-process (`Client(server)`)
+  against the FastAPI TestClient. Live: spawned over stdio → whoami, list_tasks, start_run
+  (wait) on broken-reference → BROKEN in 26s via a real worker. Demo org now has an API key
+  "Claude Code (MCP)" (raw key only in the session scratchpad).
+- 2026-11-15 — Windows: a running `rh serve` locks `.venv/Scripts/rh.exe`, which breaks
+  `uv add/sync`. Run long-lived dev processes as `uv run --no-sync python -m uvicorn ...` /
+  `python -m rewardhacker.cli worker` instead.
