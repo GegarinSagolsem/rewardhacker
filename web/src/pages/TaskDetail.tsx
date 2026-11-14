@@ -4,6 +4,7 @@ import { ArrowLeft, Play, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { RunsTable } from '../components/RunsTable'
+import { SpecCheckPanel } from '../components/SpecCheckPanel'
 import { Button, Card, EmptyState, ErrorBanner, Mono, PageHeader, Skeleton } from '../components/ui'
 import { api } from '../lib/api'
 import { atLeast } from '../lib/auth'
@@ -127,6 +128,8 @@ export default function TaskDetail() {
               </EmptyState>
             )}
           </Card>
+
+          <SpecCheckPanel orgId={org.id} taskId={taskId} canRun={atLeast(org.role, 'reviewer')} />
         </div>
 
         {atLeast(org.role, 'reviewer') && (

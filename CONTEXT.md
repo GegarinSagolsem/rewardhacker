@@ -44,7 +44,7 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
 | 4–5 | Gemini adversary + judge, spend caps | done 2026-11-14 (live: LoopBench 12/12) |
 | 6 | FastAPI backend: auth, orgs, roles, task upload, runs, job queue; traces → MongoDB | done 2026-11-14 |
 | 7–8 | React dashboard: reports, trace viewer, reviewer triage | done 2026-11-14 (triage deferred) |
-| 9 | GCS exports (signed URLs), audit log, API keys, RAG spec check vs guidelines | |
+| 9 | GCS exports (signed URLs), audit log, API keys, RAG spec check vs guidelines | done 2026-11-14 (GCS path unverified until deploy) |
 | 10 | MCP server | |
 | 11–12 | GCP deploy, CI/CD, observability | |
 | 13 | LoopBench complete; run on public benchmarks; write up results | |
@@ -97,3 +97,17 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
 - 2026-11-14 — Seeded a demo account in Neon (`demo@rewardhacker.dev`, org "Acme RL
   Environments", 4 LoopBench tasks + real runs). Password is only in the session scratchpad;
   reset by re-registering a new demo user if needed.
+- 2026-11-14 — Day 9 design: `require_role` returns a `Principal` (member or org API key);
+  keys are `rh_` + 256-bit random, stored as SHA-256, role viewer/reviewer only, bound to one
+  org, rejected on member/key/audit management and `/me`. Audit events are written in the same
+  transaction as the change they record. Exports are built synchronously (small orgs) and
+  served via 15-min links: HMAC-signed API route locally, GCS V4 signed URLs when
+  `RH_GCS_BUCKET` is set (GCS path written but not yet run against a real bucket).
+- 2026-11-14 — RAG spec check: guidelines chunked by heading, embedded with
+  `gemini-embedding-001` (768-d, re-normalised; $0.15/1M tokens, usage estimated at 4 chars/
+  token since the API reports none), stored in Mongo `guideline_chunks`; Atlas Vector Search
+  index `guideline_vectors` (READY, filter on org_id) with brute-force cosine fallback. One
+  `complete_json` call cites excerpt numbers. Live: weak-output-check → 1 high issue (format-only
+  test); strong-output-check (probes: ROBUST) → hard-coded expected total matches visible data
+  (breaks "include an unseen case"): the spec check catches things the probes can't. ~$0.0005
+  per check. Example guidelines in `examples/guidelines/` (written for this project).

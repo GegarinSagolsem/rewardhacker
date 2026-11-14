@@ -141,3 +141,80 @@ export interface TraceDoc extends AgentRun {
   probe: string
   trial: number
 }
+
+export interface AuditEvent {
+  id: string
+  actor_label: string
+  actor_user_id: string | null
+  actor_api_key_id: string | null
+  action: string
+  target_type: string | null
+  target_id: string | null
+  data: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface ApiKey {
+  id: string
+  name: string
+  prefix: string
+  role: Role
+  created_at: string
+  last_used_at: string | null
+  revoked_at: string | null
+}
+
+export interface ApiKeyCreated extends ApiKey {
+  key: string
+}
+
+export type ExportKind = 'runs.csv' | 'runs.jsonl' | 'report.md' | 'report.json'
+
+export interface ExportLink {
+  id: string
+  kind: ExportKind
+  filename: string
+  size_bytes: number
+  row_count: number
+  url: string
+  url_expires_at: string
+}
+
+export interface Guideline {
+  id: string
+  title: string
+  chunk_count: number
+  created_at: string
+}
+
+export interface GuidelineDetail extends Guideline {
+  content: string
+}
+
+export interface SpecIssue {
+  severity: 'high' | 'medium' | 'low'
+  issue: string
+  suggestion: string
+  excerpt: number | null
+  guideline_title: string | null
+  heading: string | null
+}
+
+export interface SpecExcerpt {
+  n: number
+  guideline_id: string
+  title: string
+  heading: string
+  text: string
+  score: number
+}
+
+export interface SpecCheck {
+  id: string
+  task_id: string
+  created_by_label: string
+  model: string
+  cost_usd: number
+  created_at: string
+  result: { summary: string; issues: SpecIssue[]; excerpts: SpecExcerpt[] }
+}

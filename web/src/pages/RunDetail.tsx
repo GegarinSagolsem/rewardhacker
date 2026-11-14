@@ -1,11 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { ArrowLeft, CheckCircle2, Clock, Loader2, ShieldCheck, Sparkles, Wrench } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, Download, Loader2, ShieldCheck, Sparkles, Wrench } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Menu } from '../components/Menu'
 import { TraceView } from '../components/TraceView'
 import {
   Badge,
+  Button,
   Card,
   ErrorBanner,
   Mono,
@@ -14,10 +16,11 @@ import {
   StatusBadge,
   verdictTone,
 } from '../components/ui'
-import { api } from '../lib/api'
+import { api, downloadExport } from '../lib/api'
+import { atLeast } from '../lib/auth'
 import { shortId, timeAgo, usd } from '../lib/format'
 import { useOrg } from '../lib/org'
-import type { Finding, ProbeResult, Report, RunDetail as RunDetailT, TraceDoc, Verdict } from '../lib/types'
+import type { ExportKind, Finding, ProbeResult, Report, RunDetail as RunDetailT, TraceDoc, Verdict } from '../lib/types'
 
 const VERDICT_COPY: Record<Verdict, { title: string; line: string }> = {
   exploitable: { title: 'Exploitable', line: 'The reward can be earned without doing the task.' },
@@ -176,6 +179,26 @@ function AdversarySection({ report, traces }: { report: Report; traces: TraceDoc
   )
 }
 
+function DownloadReport({ orgId, runId }: { orgId: string; runId: string }) {
+  const dl = useMutation({ mutationFn: (kind: ExportKind) => downloadExport(orgId, kind, runId) })
+  return (
+    <div className="grid justify-items-end gap-1">
+      <Menu
+        trigger={({ toggle, open }) => (
+          <Button variant="secondary" onClick={toggle} aria-expanded={open} loading={dl.isPending}>
+            <Download className="size-3.5" /> Download report
+          </Button>
+        )}
+        items={[
+          { label: 'Markdown', hint: 'Readable; paste into a ticket or PR', onSelect: () => dl.mutate('report.md') },
+          { label: 'JSON', hint: 'Full report with adversary traces', onSelect: () => dl.mutate('report.json') },
+        ]}
+      />
+      {dl.error && <span className="text-xs text-red">{dl.error.message}</span>}
+    </div>
+  )
+}
+
 function Pending({ run }: { run: RunDetailT }) {
   const running = run.status === 'running'
   return (
@@ -254,11 +277,16 @@ export default function RunDetail() {
 
           {r.status === 'done' && verdict ? (
             <>
-              <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight">
-                <span className={clsx('size-2.5 rounded-full', dotColor[tone])} />
-                <span className={textColor[tone]}>{VERDICT_COPY[verdict].title}</span>
-              </h1>
-              <p className="mt-1 text-[14px] text-muted">{VERDICT_COPY[verdict].line}</p>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight">
+                    <span className={clsx('size-2.5 rounded-full', dotColor[tone])} />
+                    <span className={textColor[tone]}>{VERDICT_COPY[verdict].title}</span>
+                  </h1>
+                  <p className="mt-1 text-[14px] text-muted">{VERDICT_COPY[verdict].line}</p>
+                </div>
+                {atLeast(org.role, 'reviewer') && <DownloadReport orgId={org.id} runId={r.id} />}
+              </div>
 
               <Card className="mt-6 grid grid-cols-2 divide-border sm:grid-cols-4 sm:divide-x">
                 <Stat label="Robustness score">

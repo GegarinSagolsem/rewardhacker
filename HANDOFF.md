@@ -1,21 +1,22 @@
 # HANDOFF.md — where we left off
 
-_Last updated: 2026-11-14 (end of days 7–8 session)_
+_Last updated: 2026-11-14 (end of day-9 session)_
 
 ## State
 
-- Days 1–8 of the plan are done (see `CONTEXT.md` → Two-week plan). Private repo
+- Days 1–9 of the plan are done (see `CONTEXT.md` → Two-week plan). Private repo
   `GegarinSagolsem/rewardhacker`, branch `main`.
 - Probing engine: 9 probes; LoopBench 12/12 with the live Gemini adversary.
-- Backend: FastAPI in `src/rewardhacker/api/` (auth, org roles, uploads, Postgres job queue,
-  Mongo traces). Neon schema at Alembic `eb2dba567a24`.
-- **Dashboard (days 7–8):** `web/` — landing page, sign in/up, org switcher, tasks (drag-and-drop
-  upload, latest verdict per task), task detail (start run, optional LLM adversary), runs list
-  (status filters, live polling), run report (verdict, score, findings + fixes, adversary
-  replay, probe table), members (admin role management). Light/dark. Checked with Playwright
-  screenshots (desktop + mobile, both themes).
-- Tests: Python 40 fast + Docker LoopBench; web: eslint + `tsc -b` + `vite build` (CI job `web`).
-- Gemini spend so far: ≈ $0.011 total.
+- Backend: FastAPI (auth, org roles, uploads, Postgres job queue, Mongo traces) plus day 9:
+  audit log, org API keys (`rh_…`), exports (runs CSV/JSONL, report MD/JSON; local HMAC links,
+  GCS signed URLs when `RH_GCS_BUCKET` is set), guidelines + RAG spec check (Gemini embeddings,
+  Atlas Vector Search index `guideline_vectors`, READY). Neon schema at Alembic `81fb72ee86e3`.
+- Dashboard: adds Guidelines, API keys, Activity pages, report download / runs export menus,
+  and a guideline-check panel on the task page. Checked with Playwright (desktop + mobile, both
+  themes) and a real browser download test.
+- Tests: 50 fast Python tests (`test_core`, `test_adversary`, `test_api`, `test_api_data`) +
+  Docker LoopBench; web eslint + tsc + build in CI.
+- Gemini spend so far: ≈ $0.013 total.
 
 ## Blocked on the user
 
@@ -23,16 +24,16 @@ _Last updated: 2026-11-14 (end of days 7–8 session)_
 
 ## Next steps (in order)
 
-1. Day 9: report exports to GCS (signed URLs; local-disk fallback until GCP exists), audit log
-   table (who uploaded / started / changed roles), org API keys for CI use, RAG check of task
-   specs against written guidelines (Mongo Atlas vector search).
-2. Small UI follow-ups: reviewer triage on findings (accept / dispute, needs a migration);
-   move `verdictTone`/`atLeast` out of component files (4 react-refresh lint warnings).
+1. Day 10: MCP server exposing RewardHacker to AI tools (list tasks, start run, get report,
+   run spec check), authenticated with an org API key.
+2. Days 11–12: GCP deploy. Verify the GCS export path for real (needs a service account that
+   can sign URLs) and open Atlas network access for Cloud Run.
+3. Small follow-ups: reviewer triage on findings; the 4 react-refresh lint warnings.
 
 ## Open questions / risks
 
 - Uploaded task Dockerfiles are built on the worker with network access (see CONTEXT.md).
+- Spec-check quality depends on the guidelines and one Flash-Lite call; it can over-report.
+  The UI shows the cited guideline section so a human can judge each issue.
 - The judge is the same model as the adversary; consider a stronger judge later.
-- Adversary compliance with "don't solve" depends on the prompt; re-run
-  `rh bench --adversary required` a few times before quoting results publicly.
 - `lingering-process` probe is timing-based; stable so far but watch CI.

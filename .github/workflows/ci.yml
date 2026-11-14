@@ -15,7 +15,7 @@ jobs:
       - name: Lint
         run: uv run ruff check . && uv run ruff format --check .
       - name: Unit + API tests (SQLite, in-memory traces; no cloud services)
-        run: uv run pytest tests/test_core.py tests/test_adversary.py tests/test_api.py -q
+        run: uv run pytest tests/test_core.py tests/test_adversary.py tests/test_api.py tests/test_api_data.py -q
       - name: LoopBench (Docker end-to-end)
         run: uv run pytest tests/test_loopbench.py -q
 

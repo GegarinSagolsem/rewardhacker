@@ -1,12 +1,14 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Play } from 'lucide-react'
+import { Download, Play } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
+import { Menu } from '../components/Menu'
 import { RunsTable } from '../components/RunsTable'
-import { Card, EmptyState, ErrorBanner, PageHeader, Skeleton } from '../components/ui'
-import { api } from '../lib/api'
+import { Button, Card, EmptyState, ErrorBanner, PageHeader, Skeleton } from '../components/ui'
+import { api, downloadExport } from '../lib/api'
+import { atLeast } from '../lib/auth'
 import { pollWhileActive, useOrg } from '../lib/org'
-import type { RunStatus } from '../lib/types'
+import type { ExportKind, RunStatus } from '../lib/types'
 
 const FILTERS: [RunStatus | undefined, string][] = [
   [undefined, 'All'],
@@ -27,10 +29,38 @@ export default function Runs() {
     refetchInterval: (q) => pollWhileActive(q.state.data) || (status === 'queued' || status === 'running' ? 2500 : false),
   })
   const tasks = useQuery({ queryKey: ['tasks', org.id], queryFn: () => api.tasks(org.id) })
+  const exp = useMutation({ mutationFn: (kind: ExportKind) => downloadExport(org.id, kind) })
 
   return (
     <div className="animate-in">
-      <PageHeader title="Runs" description="Every probe run in this organization, newest first." />
+      <PageHeader
+        title="Runs"
+        description="Every probe run in this organization, newest first."
+        actions={
+          atLeast(org.role, 'reviewer') && (
+            <Menu
+              trigger={({ toggle, open }) => (
+                <Button variant="secondary" onClick={toggle} aria-expanded={open} loading={exp.isPending}>
+                  <Download className="size-3.5" /> Export
+                </Button>
+              )}
+              items={[
+                { label: 'All runs as CSV', hint: 'One row per run, for spreadsheets', onSelect: () => exp.mutate('runs.csv') },
+                {
+                  label: 'All runs as JSON Lines',
+                  hint: 'Full reports, for pipelines',
+                  onSelect: () => exp.mutate('runs.jsonl'),
+                },
+              ]}
+            />
+          )
+        }
+      />
+      {exp.error && (
+        <div className="mb-4">
+          <ErrorBanner>{exp.error.message}</ErrorBanner>
+        </div>
+      )}
 
       <div role="tablist" aria-label="Filter by status" className="mb-4 flex flex-wrap gap-1">
         {FILTERS.map(([value, label]) => (

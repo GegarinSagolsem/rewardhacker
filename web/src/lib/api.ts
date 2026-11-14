@@ -1,4 +1,23 @@
-import type { Me, Member, Org, Role, Run, RunDetail, RunStatus, Task, TraceDoc, User } from './types'
+import type {
+  ApiKey,
+  ApiKeyCreated,
+  AuditEvent,
+  ExportKind,
+  ExportLink,
+  Guideline,
+  GuidelineDetail,
+  Me,
+  Member,
+  Org,
+  Role,
+  Run,
+  RunDetail,
+  RunStatus,
+  SpecCheck,
+  Task,
+  TraceDoc,
+  User,
+} from './types'
 
 const TOKEN_KEY = 'rh-token'
 
@@ -107,4 +126,38 @@ export const api = {
       method: 'POST',
       body: json({ include_llm: includeLlm }),
     }),
+
+  createExport: (org: string, kind: ExportKind, runId?: string) =>
+    request<ExportLink>(`/api/orgs/${org}/exports`, { method: 'POST', body: json({ kind, run_id: runId ?? null }) }),
+
+  audit: (org: string, action?: string) =>
+    request<AuditEvent[]>(`/api/orgs/${org}/audit?limit=200${action ? `&action=${encodeURIComponent(action)}` : ''}`),
+
+  apiKeys: (org: string) => request<ApiKey[]>(`/api/orgs/${org}/api-keys`),
+  createApiKey: (org: string, name: string, role: Role) =>
+    request<ApiKeyCreated>(`/api/orgs/${org}/api-keys`, { method: 'POST', body: json({ name, role }) }),
+  revokeApiKey: (org: string, id: string) => request<void>(`/api/orgs/${org}/api-keys/${id}`, { method: 'DELETE' }),
+
+  guidelines: (org: string) => request<Guideline[]>(`/api/orgs/${org}/guidelines`),
+  guideline: (org: string, id: string) => request<GuidelineDetail>(`/api/orgs/${org}/guidelines/${id}`),
+  addGuideline: (org: string, title: string, content: string) =>
+    request<Guideline>(`/api/orgs/${org}/guidelines`, { method: 'POST', body: json({ title, content }) }),
+  deleteGuideline: (org: string, id: string) =>
+    request<void>(`/api/orgs/${org}/guidelines/${id}`, { method: 'DELETE' }),
+
+  specChecks: (org: string, taskId: string) => request<SpecCheck[]>(`/api/orgs/${org}/tasks/${taskId}/spec-checks`),
+  runSpecCheck: (org: string, taskId: string) =>
+    request<SpecCheck>(`/api/orgs/${org}/tasks/${taskId}/spec-checks`, { method: 'POST' }),
+}
+
+/** Create an export and start the browser download from its short-lived signed link. */
+export async function downloadExport(org: string, kind: ExportKind, runId?: string): Promise<ExportLink> {
+  const link = await api.createExport(org, kind, runId)
+  const a = document.createElement('a')
+  a.href = link.url
+  a.download = link.filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  return link
 }

@@ -2,7 +2,10 @@ import { Navigate, Outlet, Route, Routes, useLocation, useParams } from 'react-r
 import { AppShell } from './components/AppShell'
 import { Spinner } from './components/ui'
 import { useAuth } from './lib/auth'
+import Activity from './pages/Activity'
+import ApiKeys from './pages/ApiKeys'
 import AuthPage from './pages/AuthPage'
+import Guidelines from './pages/Guidelines'
 import Landing from './pages/Landing'
 import Members from './pages/Members'
 import NewOrg from './pages/NewOrg'
@@ -96,6 +99,9 @@ export default function App() {
           <Route path="runs" element={<Runs />} />
           <Route path="runs/:runId" element={<RunDetail />} />
           <Route path="members" element={<Members />} />
+          <Route path="guidelines" element={<Guidelines />} />
+          <Route path="api-keys" element={<ApiKeys />} />
+          <Route path="activity" element={<Activity />} />
         </Route>
       </Route>
       <Route path="*" element={<NotFound />} />

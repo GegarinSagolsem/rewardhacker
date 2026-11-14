@@ -107,3 +107,82 @@ class RunOut(_Out):
 class RunDetail(RunOut):
     report: dict | None
     traces_stored: bool
+
+
+class AuditOut(_Out):
+    id: str
+    actor_label: str
+    actor_user_id: str | None
+    actor_api_key_id: str | None
+    action: str
+    target_type: str | None
+    target_id: str | None
+    data: dict | None
+    created_at: datetime
+
+
+class ApiKeyCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    role: Role = Field(default=Role.REVIEWER, description="viewer or reviewer; keys can't be admins")
+
+
+class ApiKeyOut(_Out):
+    id: str
+    name: str
+    prefix: str
+    role: Role
+    created_at: datetime
+    last_used_at: datetime | None
+    revoked_at: datetime | None
+
+
+class ApiKeyCreated(ApiKeyOut):
+    key: str = Field(description="Shown once. Store it now; only a hash is kept.")
+
+
+class ExportCreate(BaseModel):
+    kind: str = Field(description="runs.csv | runs.jsonl | report.md | report.json")
+    run_id: str | None = Field(default=None, description="Required for report.* kinds")
+
+
+class ExportOut(_Out):
+    id: str
+    kind: str
+    run_id: str | None
+    filename: str
+    content_type: str
+    size_bytes: int
+    row_count: int
+    created_by_label: str
+    created_at: datetime
+
+
+class ExportLink(ExportOut):
+    url: str
+    url_expires_at: datetime
+
+
+class GuidelineCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=200_000, description="Markdown")
+
+
+class GuidelineOut(_Out):
+    id: str
+    title: str
+    chunk_count: int
+    created_at: datetime
+
+
+class GuidelineDetail(GuidelineOut):
+    content: str
+
+
+class SpecCheckOut(_Out):
+    id: str
+    task_id: str
+    created_by_label: str
+    model: str
+    cost_usd: float
+    result: dict
+    created_at: datetime

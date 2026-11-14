@@ -1,8 +1,21 @@
 import clsx from 'clsx'
-import { Check, ChevronsUpDown, FolderArchive, LogOut, Menu, Plus, Play, Users, X } from 'lucide-react'
+import {
+  BookOpenText,
+  Check,
+  ChevronsUpDown,
+  FolderArchive,
+  History,
+  KeyRound,
+  LogOut,
+  Menu,
+  Plus,
+  Play,
+  Users,
+  X,
+} from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../lib/auth'
+import { atLeast, useAuth } from '../lib/auth'
 import type { Org } from '../lib/types'
 import { Badge, Logo, ThemeToggle } from './ui'
 
@@ -108,9 +121,25 @@ function Sidebar({ org }: { org: Org }) {
         <NavItem to={`${base}/runs`} icon={<Play />}>
           Runs
         </NavItem>
+        <NavItem to={`${base}/guidelines`} icon={<BookOpenText />}>
+          Guidelines
+        </NavItem>
+      </nav>
+      <nav className="grid gap-0.5" aria-label="Organization">
+        <div className="px-2 pb-1 text-[11px] font-medium text-subtle">Organization</div>
         <NavItem to={`${base}/members`} icon={<Users />}>
           Members
         </NavItem>
+        {atLeast(org.role, 'admin') && (
+          <>
+            <NavItem to={`${base}/api-keys`} icon={<KeyRound />}>
+              API keys
+            </NavItem>
+            <NavItem to={`${base}/activity`} icon={<History />}>
+              Activity
+            </NavItem>
+          </>
+        )}
       </nav>
       <div className="mt-auto grid gap-3 border-t border-border pt-3">
         <div className="flex items-center justify-between gap-2 px-1">

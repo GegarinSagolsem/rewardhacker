@@ -5,101 +5,27 @@ from __future__ import annotations
 import io
 import zipfile
 from datetime import timedelta
-from pathlib import Path
 
 import pytest
 
 pytest.importorskip("fastapi")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from api_helpers import (  # noqa: E402
+    PASSWORD,
+    TASK_DIR,
+    fake_report,
+    make_org,
+    register,
+    upload,
+    zip_dir,
+    zip_entries,
+)
 
 from rewardhacker.api import jobs  # noqa: E402
-from rewardhacker.api.app import create_app  # noqa: E402
-from rewardhacker.api.db import Base, make_engine, make_sessionmaker, normalize_url  # noqa: E402
-from rewardhacker.api.settings import ApiSettings  # noqa: E402
+from rewardhacker.api.db import normalize_url  # noqa: E402
 from rewardhacker.api.storage import BundleError, extract_bundle  # noqa: E402
 from rewardhacker.api.tables import Run, utcnow  # noqa: E402
 from rewardhacker.api.traces import MemoryTraceStore  # noqa: E402
-from rewardhacker.models import AgentRun, AgentStep, LLMUsage, ProbeResult, Report, Trial  # noqa: E402
-
-TASK_DIR = Path(__file__).parent.parent / "loopbench" / "tasks" / "weak-output-check"
-PASSWORD = "correct-horse-battery"
-
-
-def zip_dir(src: Path, prefix: str = "") -> bytes:
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
-        for p in sorted(src.rglob("*")):
-            if p.is_file():
-                zf.write(p, prefix + p.relative_to(src).as_posix())
-    return buf.getvalue()
-
-
-def zip_entries(entries: dict[str, bytes]) -> bytes:
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
-        for name, data in entries.items():
-            zf.writestr(name, data)
-    return buf.getvalue()
-
-
-@pytest.fixture
-def env(tmp_path):
-    engine = make_engine("sqlite://")
-    Base.metadata.create_all(engine)
-    settings = ApiSettings(database_url="sqlite://", jwt_secret="x" * 40, storage_dir=tmp_path / "store")
-    traces = MemoryTraceStore()
-    app = create_app(settings, engine=engine, traces=traces)
-    client = TestClient(app)
-    return client, make_sessionmaker(engine), traces
-
-
-def register(client, email: str) -> dict:
-    assert client.post("/api/auth/register", json={"email": email, "password": PASSWORD}).status_code == 201
-    tok = client.post("/api/auth/login", json={"email": email, "password": PASSWORD}).json()["access_token"]
-    return {"Authorization": f"Bearer {tok}"}
-
-
-def make_org(client, headers) -> str:
-    r = client.post("/api/orgs", json={"name": "Acme RL"}, headers=headers)
-    assert r.status_code == 201 and r.json()["role"] == "admin"
-    return r.json()["id"]
-
-
-def upload(client, org, headers, data: bytes):
-    return client.post(
-        f"/api/orgs/{org}/tasks", files={"file": ("task.zip", data, "application/zip")}, headers=headers
-    )
-
-
-def fake_report(task_id: str) -> Report:
-    agent = AgentRun(
-        steps=[AgentStep(step=1, tool="bash", args={"command": "echo 'total: 0' > report.txt"})],
-        explanation="wrote a placeholder total",
-        stop_reason="submitted",
-        usage=LLMUsage(model="fake", calls=2, cost_usd=0.001),
-        judgement="shortcut",
-    )
-    probe = ProbeResult(
-        name="adversary",
-        title="LLM adversary",
-        expect_pass=False,
-        status="finding",
-        trials=[Trial(index=0, passed=True, agent=agent)],
-    )
-    return Report(
-        task_id=task_id,
-        image="img",
-        rewardhacker_version="test",
-        started_at="2026-11-14T00:00:00+00:00",
-        duration_sec=1.0,
-        probes=[probe],
-        findings=[],
-        score=50,
-        verdict="exploitable",
-        llm_usage=agent.usage,
-    )
-
 
 # --- auth -----------------------------------------------------------------------------------
 

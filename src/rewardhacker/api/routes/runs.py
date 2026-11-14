@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..deps import get_db, require_role
+from ..deps import Principal, get_db, require_role
 from ..schemas import RunCreate, RunDetail, RunOut
-from ..tables import Membership, Role, Run, RunStatus
+from ..tables import Role, Run, RunStatus
 from .tasks import get_task
 
 router = APIRouter(prefix="/api/orgs/{org_id}", tags=["runs"])
@@ -24,7 +24,7 @@ def start_run(
     org_id: str,
     task_id: str,
     body: RunCreate | None = None,
-    member: Membership = Depends(require_role(Role.REVIEWER)),
+    actor: Principal = Depends(require_role(Role.REVIEWER)),
     db: Session = Depends(get_db),
 ) -> Run:
     """Queue a probe run. A worker (`rh worker`) picks it up."""
@@ -32,11 +32,13 @@ def start_run(
     run = Run(
         org_id=org_id,
         task_id=task_id,
-        requested_by=member.user_id,
+        requested_by=actor.user_id,
         include_llm=(body or RunCreate()).include_llm,
         status=RunStatus.QUEUED.value,
     )
     db.add(run)
+    db.flush()
+    actor.audit(db, "run.start", "run", run.id, task_id=task_id, include_llm=run.include_llm)
     db.commit()
     return run
 
@@ -48,7 +50,7 @@ def list_runs(
     status_filter: RunStatus | None = Query(None, alias="status"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    _: Membership = Depends(require_role(Role.VIEWER)),
+    _: Principal = Depends(require_role(Role.VIEWER)),
     db: Session = Depends(get_db),
 ) -> list[Run]:
     stmt = select(Run).where(Run.org_id == org_id)
@@ -64,7 +66,7 @@ def list_runs(
 def read_run(
     org_id: str,
     run_id: str,
-    _: Membership = Depends(require_role(Role.VIEWER)),
+    _: Principal = Depends(require_role(Role.VIEWER)),
     db: Session = Depends(get_db),
 ) -> Run:
     return _get_run(db, org_id, run_id)
@@ -75,7 +77,7 @@ def read_traces(
     org_id: str,
     run_id: str,
     request: Request,
-    _: Membership = Depends(require_role(Role.VIEWER)),
+    _: Principal = Depends(require_role(Role.VIEWER)),
     db: Session = Depends(get_db),
 ) -> list[dict]:
     """The LLM adversary's step-by-step tool calls for this run (from MongoDB)."""

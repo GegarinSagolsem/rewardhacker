@@ -27,6 +27,9 @@ api = [
     "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.30",
 ]
+gcs = [
+    "google-cloud-storage>=2.18",
+]
 
 [project.scripts]
 rh = "rewardhacker.cli:app"

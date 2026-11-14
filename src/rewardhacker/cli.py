@@ -267,5 +267,20 @@ def worker(
     console.print(f"processed {n} run(s)")
 
 
+@app.command("setup-search")
+def setup_search() -> None:
+    """Create the MongoDB Atlas Vector Search index used by guideline retrieval (idempotent)."""
+    _require_api_extra()
+    from .api.rag import VECTOR_INDEX, MongoGuidelineIndex
+    from .api.settings import get_api_settings
+
+    s = get_api_settings()
+    if not s.mongodb_uri:
+        console.print("[red]MONGODB_URI is not set[/red]")
+        raise typer.Exit(1)
+    state = MongoGuidelineIndex(s.mongodb_uri, s.mongodb_db).ensure_vector_index()
+    console.print(f"vector index [bold]{VECTOR_INDEX}[/bold]: {state} (Atlas builds it in the background)")
+
+
 if __name__ == "__main__":
     app()

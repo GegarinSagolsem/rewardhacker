@@ -23,6 +23,8 @@ class ApiSettings:
     storage_dir: Path = Path.home() / ".rewardhacker" / "tasks"
     max_upload_mb: int = 20
     cors_origins: tuple[str, ...] = ("http://localhost:5173",)
+    exports_dir: Path = Path.home() / ".rewardhacker" / "exports"
+    gcs_bucket: str | None = None  # set → exports go to GCS with V4 signed URLs
 
 
 def get_api_settings() -> ApiSettings:
@@ -44,4 +46,8 @@ def get_api_settings() -> ApiSettings:
         storage_dir=Path(storage) if storage else ApiSettings.storage_dir,
         max_upload_mb=int(os.environ.get("RH_MAX_UPLOAD_MB", 20)),
         cors_origins=tuple(o.strip() for o in origins.split(",") if o.strip()),
+        exports_dir=Path(os.environ["RH_EXPORTS_DIR"])
+        if os.environ.get("RH_EXPORTS_DIR")
+        else ApiSettings.exports_dir,
+        gcs_bucket=os.environ.get("RH_GCS_BUCKET", "").strip() or None,
     )

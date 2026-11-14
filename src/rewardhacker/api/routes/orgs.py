@@ -4,11 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..deps import current_user, get_db, require_role
+from ..deps import Principal, current_user, get_db, require_role
 from ..schemas import MemberAdd, MemberOut, MemberUpdate, OrgCreate, OrgOut
 from ..tables import Membership, Org, Role, User
 
 router = APIRouter(prefix="/api/orgs", tags=["orgs"])
+
+admin_only = require_role(Role.ADMIN, allow_api_key=False)
 
 
 def _member_out(m: Membership, email: str) -> MemberOut:
@@ -34,6 +36,9 @@ def create_org(body: OrgCreate, user: User = Depends(current_user), db: Session 
     db.add(org)
     db.flush()
     db.add(Membership(user_id=user.id, org_id=org.id, role=Role.ADMIN.value))
+    Principal(org.id, Role.ADMIN, user.email, user_id=user.id).audit(
+        db, "org.create", "org", org.id, name=org.name
+    )
     db.commit()
     return OrgOut(id=org.id, name=org.name, created_at=org.created_at, role=Role.ADMIN)
 
@@ -51,7 +56,7 @@ def list_orgs(user: User = Depends(current_user), db: Session = Depends(get_db))
 
 @router.get("/{org_id}/members", response_model=list[MemberOut])
 def list_members(
-    org_id: str, _: Membership = Depends(require_role(Role.VIEWER)), db: Session = Depends(get_db)
+    org_id: str, _: Principal = Depends(require_role(Role.VIEWER)), db: Session = Depends(get_db)
 ) -> list[MemberOut]:
     rows = db.execute(
         select(Membership, User.email)
@@ -66,7 +71,7 @@ def list_members(
 def add_member(
     org_id: str,
     body: MemberAdd,
-    _: Membership = Depends(require_role(Role.ADMIN)),
+    actor: Principal = Depends(admin_only),
     db: Session = Depends(get_db),
 ) -> MemberOut:
     user = db.scalars(select(User).where(User.email == body.email)).first()
@@ -76,6 +81,7 @@ def add_member(
         raise HTTPException(status.HTTP_409_CONFLICT, "already a member")
     m = Membership(user_id=user.id, org_id=org_id, role=body.role.value)
     db.add(m)
+    actor.audit(db, "member.add", "user", user.id, email=user.email, role=body.role.value)
     db.commit()
     return _member_out(m, user.email)
 
@@ -85,7 +91,7 @@ def update_member(
     org_id: str,
     user_id: str,
     body: MemberUpdate,
-    _: Membership = Depends(require_role(Role.ADMIN)),
+    actor: Principal = Depends(admin_only),
     db: Session = Depends(get_db),
 ) -> MemberOut:
     m = db.get(Membership, (user_id, org_id))
@@ -93,16 +99,19 @@ def update_member(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "member not found")
     if m.role == Role.ADMIN.value and body.role != Role.ADMIN:
         _ensure_other_admin(db, org_id, user_id)
+    email = db.get(User, user_id).email
+    if m.role != body.role.value:
+        actor.audit(db, "member.role_change", "user", user_id, email=email, old=m.role, new=body.role.value)
     m.role = body.role.value
     db.commit()
-    return _member_out(m, db.get(User, user_id).email)
+    return _member_out(m, email)
 
 
 @router.delete("/{org_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_member(
     org_id: str,
     user_id: str,
-    _: Membership = Depends(require_role(Role.ADMIN)),
+    actor: Principal = Depends(admin_only),
     db: Session = Depends(get_db),
 ) -> Response:
     m = db.get(Membership, (user_id, org_id))
@@ -110,6 +119,7 @@ def remove_member(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "member not found")
     if m.role == Role.ADMIN.value:
         _ensure_other_admin(db, org_id, user_id)
+    actor.audit(db, "member.remove", "user", user_id, email=db.get(User, user_id).email, role=m.role)
     db.delete(m)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
