@@ -51,6 +51,12 @@ Web backend (`src/rewardhacker/api/`, needs the `api` extra):
 | `storage.py` | Safe zip extraction for uploads (zip-slip, symlinks, bombs) |
 | `security.py`, `settings.py`, `db.py`, `schemas.py`, `worker.py` | hashing + JWT, env config, engine, I/O models, worker loop |
 
+Web dashboard (`web/`, React 19 + TS + Vite + Tailwind v4 + TanStack Query + React Router):
+`src/lib/api.ts` (typed client, JWT in localStorage), `lib/types.ts` (mirrors `api/schemas.py` +
+`models.py`, keep in sync), `lib/auth.tsx`, `components/ui.tsx` (design primitives; colours are
+semantic tokens in `index.css`, light + dark), `pages/` (Landing, AuthPage, Tasks, TaskDetail,
+Runs, RunDetail, Members). Dev: `rh serve` on :8000 + `cd web && npm run dev` (proxies `/api`).
+
 `migrations/` = Alembic (reads `DATABASE_URL`). After changing `tables.py`:
 `uv run alembic revision --autogenerate -m "..."` then `uv run alembic upgrade head`.
 
@@ -69,6 +75,7 @@ uv run rh probe loopbench/tasks/<task> [--no-llm] [--json out.json]
 uv run rh bench [--adversary off|required|all]
 uv run rh serve [--reload]                # API on :8000, docs at /docs (needs DATABASE_URL, RH_JWT_SECRET)
 uv run rh worker [--once]                 # executes queued runs (needs Docker)
+cd web && npm run dev                     # dashboard on :5173; npm run build / npx eslint src
 ```
 
 ## Rules

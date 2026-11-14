@@ -43,7 +43,7 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
 | 3 | tamper probes, LoopBench ~10 tasks, `rh bench` | done 2026-11-13 |
 | 4–5 | Gemini adversary + judge, spend caps | done 2026-11-14 (live: LoopBench 12/12) |
 | 6 | FastAPI backend: auth, orgs, roles, task upload, runs, job queue; traces → MongoDB | done 2026-11-14 |
-| 7–8 | React dashboard: reports, trace viewer, reviewer triage | |
+| 7–8 | React dashboard: reports, trace viewer, reviewer triage | done 2026-11-14 (triage deferred) |
 | 9 | GCS exports (signed URLs), audit log, API keys, RAG spec check vs guidelines | |
 | 10 | MCP server | |
 | 11–12 | GCP deploy, CI/CD, observability | |
@@ -88,3 +88,12 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
   user + "E2E org" in Neon.
 - 2026-11-14 — Known risk: uploaded tasks' Dockerfiles are built on the worker (`docker build`
   has network access). Acceptable for invited orgs; revisit before opening public sign-up.
+- 2026-11-14 — Dashboard design brief (user's picks): "modern SaaS" feel, references Linear +
+  Vercel dashboard, light + dark toggle, one violet accent (#6d28d9 / #8b5cf6), Geist + Geist
+  Mono (self-hosted via @fontsource), wordmark + "broken checkmark" logo designed in-house.
+  Colour otherwise only encodes verdict/severity. Public landing page included; its hero is a
+  real adversary trace (weak-output-check), not a mock-up. Verified with Playwright at
+  1440px and 390px, light + dark: no horizontal overflow, fonts load.
+- 2026-11-14 — Seeded a demo account in Neon (`demo@rewardhacker.dev`, org "Acme RL
+  Environments", 4 LoopBench tasks + real runs). Password is only in the session scratchpad;
+  reset by re-registering a new demo user if needed.

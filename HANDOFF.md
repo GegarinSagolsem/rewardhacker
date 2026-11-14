@@ -1,20 +1,21 @@
 # HANDOFF.md — where we left off
 
-_Last updated: 2026-11-14 (end of day-6 session)_
+_Last updated: 2026-11-14 (end of days 7–8 session)_
 
 ## State
 
-- Days 1–6 of the plan are done (see `CONTEXT.md` → Two-week plan). Private repo
+- Days 1–8 of the plan are done (see `CONTEXT.md` → Two-week plan). Private repo
   `GegarinSagolsem/rewardhacker`, branch `main`.
 - Probing engine: 9 probes; LoopBench 12/12 with the live Gemini adversary.
-- **Backend (day 6):** FastAPI in `src/rewardhacker/api/` — register/login (JWT), orgs with
-  viewer/reviewer/admin roles, .zip task upload, runs queued in Postgres and executed by
-  `rh worker`, adversary traces in MongoDB. Schema migrated on Neon (`alembic current` =
-  `eb2dba567a24`). Verified live end-to-end (CONTEXT.md log, 2026-11-14).
-- `.env` has `GEMINI_API_KEY`, `DATABASE_URL` (Neon), `MONGODB_URI` (Atlas), `RH_JWT_SECRET`.
-- Tests: `test_core.py` + `test_adversary.py` + `test_api.py` (40, fast, no cloud) and
-  `test_loopbench.py` (Docker, ~3 min). Docker Desktop must be running for probes/worker.
-- Gemini spend so far: ≈ $0.009 total.
+- Backend: FastAPI in `src/rewardhacker/api/` (auth, org roles, uploads, Postgres job queue,
+  Mongo traces). Neon schema at Alembic `eb2dba567a24`.
+- **Dashboard (days 7–8):** `web/` — landing page, sign in/up, org switcher, tasks (drag-and-drop
+  upload, latest verdict per task), task detail (start run, optional LLM adversary), runs list
+  (status filters, live polling), run report (verdict, score, findings + fixes, adversary
+  replay, probe table), members (admin role management). Light/dark. Checked with Playwright
+  screenshots (desktop + mobile, both themes).
+- Tests: Python 40 fast + Docker LoopBench; web: eslint + `tsc -b` + `vite build` (CI job `web`).
+- Gemini spend so far: ≈ $0.011 total.
 
 ## Blocked on the user
 
@@ -22,11 +23,11 @@ _Last updated: 2026-11-14 (end of day-6 session)_
 
 ## Next steps (in order)
 
-1. Days 7–8: React + TypeScript + Vite dashboard in `web/`: login, org switcher, task upload,
-   run list with status polling, report view (findings, score, verdict), adversary trace viewer
-   (`GET /api/orgs/{org}/runs/{run}/traces`), member management for admins.
-   CORS already allows `http://localhost:5173`.
-2. Consider a "reviewer triage" field on runs (accept / dispute a finding) — needs a migration.
+1. Day 9: report exports to GCS (signed URLs; local-disk fallback until GCP exists), audit log
+   table (who uploaded / started / changed roles), org API keys for CI use, RAG check of task
+   specs against written guidelines (Mongo Atlas vector search).
+2. Small UI follow-ups: reviewer triage on findings (accept / dispute, needs a migration);
+   move `verdictTone`/`atLeast` out of component files (4 react-refresh lint warnings).
 
 ## Open questions / risks
 
