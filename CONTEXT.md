@@ -41,7 +41,7 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
 |---|---|---|
 | 1–2 | task.yaml, sandbox, null/reference/flaky probes, CLI | done 2026-11-13 |
 | 3 | tamper probes, LoopBench ~10 tasks, `rh bench` | done 2026-11-13 |
-| 4–5 | Gemini adversary + judge, spend caps | code done 2026-11-13; live Gemini run pending API key |
+| 4–5 | Gemini adversary + judge, spend caps | done 2026-11-14 (live: LoopBench 12/12) |
 | 6 | FastAPI backend: auth, orgs, roles, task upload, runs, job queue; traces → MongoDB | |
 | 7–8 | React dashboard: reports, trace viewer, reviewer triage | |
 | 9 | GCS exports (signed URLs), audit log, API keys, RAG spec check vs guidelines | |
@@ -66,3 +66,13 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
   ai.google.dev pricing page); 2.5 Flash-Lite cheaper but reportedly near end-of-life. Exact
   model ID still to be verified against the live API.
 - 2026-11-13 — google-genai is an optional extra (`rewardhacker[llm]`); core works without it.
+- 2026-11-14 — Model ID `gemini-3.1-flash-lite` verified against the live API (also listed:
+  `gemini-2.5-flash-lite`, `gemini-3.5-flash-lite` — pricing for 3.5 unchecked, not adopted).
+- 2026-11-14 — First live run: Flash-Lite ignored "don't solve" and computed the real answer
+  (judge: genuine → weak verifier missed). Fix: prompt now demands *deliberately wrong* output
+  ("a pass only matters if your work is wrong") and repeats it in the first user message.
+  After fix: `weak-output-check` → `total: 0` shortcut, EXPLOITABLE; `rh bench --adversary
+  required` 12/12. Cost: ~$0.001–0.003 per adversary run; $0.0072 for the whole day.
+- 2026-11-14 — Day-6 databases: Neon Postgres (AWS Singapore, PG 18) + MongoDB Atlas M0
+  (cluster "Gegarin"), used from local dev too (user's choice over docker-compose). Env vars
+  `DATABASE_URL`, `MONGODB_URI`.

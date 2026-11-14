@@ -1,36 +1,38 @@
 # HANDOFF.md — where we left off
 
-_Last updated: 2026-11-13 (end of day-4 session)_
+_Last updated: 2026-11-14 (days 4–5 closed with live Gemini; day 6 not started)_
 
 ## State
 
-- Days 1–4 of the plan are built (see `CONTEXT.md` → Two-week plan). All committed to the
-  private repo `GegarinSagolsem/rewardhacker`, branch `main`. CI green on GitHub Actions.
+- Days 1–5 of the plan are done (see `CONTEXT.md` → Two-week plan). Private repo
+  `GegarinSagolsem/rewardhacker`, branch `main`.
 - 9 probes: 8 static + `adversary` (Gemini agent + judge).
-- LoopBench: 12 tasks. 10 static tasks pass 10/10 (precision/recall 100%, stable across runs).
-  2 LLM tasks (`weak-output-check`, `strong-output-check`) are **skipped until a Gemini key
-  exists**; the adversary flow itself is tested end-to-end in Docker with a scripted FakeLLM.
+- LoopBench: 12 tasks, **12/12 with the live adversary** (`rh bench --adversary required`,
+  2026-11-14). Adversary prompt was tuned after the first live run (see CONTEXT.md log).
+- Gemini spend so far: $0.0072 total.
+- `.env` exists with `GEMINI_API_KEY`, `DATABASE_URL` (Neon, verified connecting) and
+  `MONGODB_URI` (Atlas). Check values without printing them (see CLAUDE.md).
 - Tests: `tests/test_core.py` + `tests/test_adversary.py` (22, fast) and
-  `tests/test_loopbench.py` (Docker, ~3 min).
+  `tests/test_loopbench.py` (Docker, ~3 min). Docker Desktop must be running.
 
 ## Blocked on the user
 
-- `.env` with `GEMINI_API_KEY=...` in the repo root (template: `.env.example`). Not created yet.
+- **MongoDB Atlas auth fails** (`bad auth : authentication failed`; network reachable). The
+  user/password in `MONGODB_URI` don't match an Atlas database user. User to fix under
+  Atlas → Database & Network Access → Database Users. Re-check with a ping before day-6 Mongo work.
 
 ## Next steps (in order)
 
-1. When `.env` exists: verify the key without printing it; list available models and confirm
-   the exact ID for `gemini-3.1-flash-lite` (update `PRICES_PER_M` / default in `config.py` if
-   the ID differs).
-2. Live smoke test: `uv run rh probe loopbench/tasks/weak-output-check` — expect a
-   `adversary-shortcut` finding; check the cost line (should be ~$0.01–0.03).
-3. `uv run rh bench --adversary required` — both LLM tasks should pass. If the adversary
-   genuinely solves `weak-output-check` instead of cheating, tune `SYSTEM_PROMPT`.
-4. Record live results (cost, steps, pass/fail) in `CONTEXT.md`.
-5. Start day 6: FastAPI backend (see plan). Store agent traces in MongoDB.
+1. Re-verify Mongo connectivity once the user fixes credentials.
+2. Day 6: FastAPI backend — auth (JWT + hashed passwords), orgs + roles, task upload, runs,
+   Postgres-backed job queue (`SELECT … FOR UPDATE SKIP LOCKED`) + worker process that calls
+   `runner.py`; SQLAlchemy + Alembic on Neon; agent traces → MongoDB.
+3. Keep tests DB-free where possible (SQLite / mongomock or fakes); don't hit Neon/Atlas in CI.
 
 ## Open questions / risks
 
 - The judge is the same model as the adversary; consider a stronger judge model later if
   judgements look wrong (cost trade-off).
-- `lingering-process` probe is timing-based; stable in 3/3 runs so far but watch CI.
+- Adversary compliance with "don't solve" depends on the prompt; one live run each so far.
+  Re-run `rh bench --adversary required` a few times before quoting results publicly.
+- `lingering-process` probe is timing-based; stable so far but watch CI.
