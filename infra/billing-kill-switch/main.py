@@ -61,8 +61,7 @@ def _handle(msg: dict) -> None:
     if msg.get("selfTest"):
         info = client.get_project_billing_info(name=PROJECT_NAME)
         if not can_unlink_billing():
-            log("ERROR", f"self-test: missing {UNLINK_PERMISSION}; kill switch cannot work",
-                event="failure")
+            log("ERROR", f"self-test: missing {UNLINK_PERMISSION}; kill switch cannot work", event="failure")
             return
         log("INFO", "self-test ok", event="selftest_ok", billing_enabled=info.billing_enabled)
         return
@@ -70,8 +69,14 @@ def _handle(msg: dict) -> None:
     cost = float(msg.get("costAmount", 0))
     budget = float(msg.get("budgetAmount", 0))
     dry_run = bool(msg.get("dryRun", False))
-    log("INFO", "budget notification", budget_name=msg.get("budgetDisplayName"),
-        cost=cost, budget=budget, dry_run=dry_run)
+    log(
+        "INFO",
+        "budget notification",
+        budget_name=msg.get("budgetDisplayName"),
+        cost=cost,
+        budget=budget,
+        dry_run=dry_run,
+    )
     if budget <= 0 or cost < budget:
         return
 
@@ -80,13 +85,19 @@ def _handle(msg: dict) -> None:
         log("INFO", f"billing already disabled for {PROJECT_ID}")
         return
     if dry_run:
-        log("WARNING", f"DRY RUN: would disable billing for {PROJECT_ID} (cost {cost} >= {budget})",
-            event="dry_run")
+        log(
+            "WARNING",
+            f"DRY RUN: would disable billing for {PROJECT_ID} (cost {cost} >= {budget})",
+            event="dry_run",
+        )
         return
 
     client.update_project_billing_info(
         name=PROJECT_NAME,
         project_billing_info=billing_v1.ProjectBillingInfo(billing_account_name=""),
     )
-    log("CRITICAL", f"billing DISABLED for {PROJECT_ID} (cost {cost} >= budget {budget})",
-        event="billing_disabled")
+    log(
+        "CRITICAL",
+        f"billing DISABLED for {PROJECT_ID} (cost {cost} >= budget {budget})",
+        event="billing_disabled",
+    )
