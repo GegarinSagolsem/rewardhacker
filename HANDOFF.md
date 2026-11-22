@@ -33,6 +33,9 @@ _Last updated: 2026-11-22 (days 11–12 core done: cloud deploy + CD from GitHub
 - Atlas Network Access opened to 0.0.0.0/0 (2026-11-22, by the user). Full cloud E2E passes:
   upload → Cloud Build worker (auto-dispatched) → weak-output-check EXPLOITABLE, trace in
   Atlas, $0.0018 recorded in the shared Mongo ledger (`llm_spend`).
+- Cost controls (2026-11-23): cloud LLM cap $0.10/day (workers too), Gemini-project budget
+  ₹200 alerts, AI features per-org opt-in (`uv run rh llm-access` lists/toggles). Verified live:
+  new org → 403 on AI run; after approval → EXPLOITABLE; worker build env has the $0.10 cap.
 - Test data in Neon: a few `e2e-cloud-*@example.com` users + "E2E cloud org".
 
 ## Next steps (in order)
