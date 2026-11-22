@@ -164,3 +164,9 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
   (migration c4e1a9d27b30, Neon migrated), `RH_NEW_ORGS_LLM=0` on Cloud Run (default on for
   local dev), 403 otherwise; operator toggles with `rh llm-access [<org-id>] [--off]`. Demo org
   "Acme RL Environments" enabled. Dashboard greys out AI controls with an explanation.
+- 2026-11-23 — Day 13: `rh import-tb` converts Terminal-Bench 1 (harbor-framework/terminal-bench-1
+  @ d28711d, Apache-2.0) tasks: 198 of 241 imported, 43 skipped with reasons (multi-container,
+  solution.yaml-only, Dockerfile bakes in tests, unsupported compose options). Faithful mapping:
+  agent = root, `run-tests.sh` unchanged, network on. New `environment.network: none|bridge`
+  (default none); bridge needs `RH_ALLOW_TASK_NETWORK=1` (sandbox guard) and is always refused
+  for web uploads. Imported tasks live in git-ignored `benchmarks/` (TB canary: never commit).

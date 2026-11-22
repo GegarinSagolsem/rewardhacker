@@ -10,3 +10,6 @@ dist/
 node_modules/
 !.env.example
 PRIVATE_NOTES.md
+
+# Imported third-party benchmark tasks (canary: never commit benchmark data)
+benchmarks/

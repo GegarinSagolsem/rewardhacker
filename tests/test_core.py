@@ -116,3 +116,20 @@ def test_get_probes():
     assert [p.name for p in get_probes(["null"])] == ["null"]
     with pytest.raises(ValueError, match="unknown"):
         get_probes(["nope"])
+
+
+def test_task_network_needs_operator_opt_in(tmp_path, monkeypatch):
+    import shutil
+
+    from rewardhacker.sandbox import DockerError, Sandbox
+    from rewardhacker.taskspec import TaskSpec
+
+    src = Path(__file__).parent.parent / "loopbench" / "tasks" / "weak-output-check"
+    shutil.copytree(src, tmp_path / "t")
+    y = tmp_path / "t" / "task.yaml"
+    y.write_text(y.read_text().replace("environment:\n", "environment:\n  network: bridge\n"))
+    task = TaskSpec.load(tmp_path / "t")
+    assert task.environment.network == "bridge"
+    monkeypatch.delenv("RH_ALLOW_TASK_NETWORK", raising=False)
+    with pytest.raises(DockerError, match="RH_ALLOW_TASK_NETWORK"):
+        Sandbox("unused-image", task).__enter__()  # refused before any docker call

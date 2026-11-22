@@ -11,12 +11,19 @@ A task is a directory with a ``task.yaml`` plus the files it references::
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError
 
 TASK_FILE = "task.yaml"
+NETWORK_OPT_IN = "RH_ALLOW_TASK_NETWORK"
+
+
+def task_network_allowed() -> bool:
+    return os.environ.get(NETWORK_OPT_IN, "").lower() in ("1", "true", "yes")
 
 
 class TaskSpecError(ValueError):
@@ -34,6 +41,11 @@ class Environment(_Strict):
     # User the agent (and the reference solution) runs as. None = the image's default user.
     # Running the agent as an unprivileged user is the main defence against tampering.
     agent_user: str | None = None
+    # Network for the whole trial (agent, solution, verifier). "none" by default: the agent can't
+    # exfiltrate or fetch answers. "bridge" exists for faithfully running imported benchmarks
+    # whose agents normally have internet (e.g. Terminal-Bench); it's refused unless the operator
+    # sets RH_ALLOW_TASK_NETWORK=1, and the web API never accepts it.
+    network: Literal["none", "bridge"] = "none"
 
 
 class Verifier(_Strict):

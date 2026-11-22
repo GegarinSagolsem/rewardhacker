@@ -528,3 +528,17 @@ def test_workers_get_the_same_llm_caps_as_the_api(monkeypatch):
     env = dispatcher_from_env().build_spec()["steps"][0]["env"]
     assert "RH_DAILY_BUDGET_USD=0.10" in env and "RH_GCS_BUCKET=b" in env
     assert not any(e.startswith("RH_RUN_BUDGET_USD=") for e in env)  # unset → worker default
+
+
+def test_uploads_cannot_request_network(env, tmp_path):
+    import shutil
+
+    client, _, _ = env
+    h = register(client, "a@x.io")
+    org = make_org(client, h)
+    task = tmp_path / "t"
+    shutil.copytree(TASK_DIR, task)
+    spec = (task / "task.yaml").read_text().replace("environment:\n", "environment:\n  network: bridge\n")
+    (task / "task.yaml").write_text(spec)
+    r = upload(client, org, h, zip_dir(task))
+    assert r.status_code == 422 and "network" in r.text

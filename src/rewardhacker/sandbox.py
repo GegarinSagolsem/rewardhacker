@@ -14,7 +14,7 @@ import uuid
 from pathlib import Path
 
 from .models import ExecResult
-from .taskspec import TaskSpec
+from .taskspec import NETWORK_OPT_IN, TaskSpec, task_network_allowed
 
 MAX_OUTPUT_CHARS = 8000
 LABEL = "dev.rewardhacker=1"
@@ -96,6 +96,12 @@ class Sandbox:
         self.started = False
 
     def __enter__(self) -> Sandbox:
+        network = self.task.environment.network
+        if network != "none" and not task_network_allowed():
+            raise DockerError(
+                f"task {self.task.id!r} asks for network={network!r}; set {NETWORK_OPT_IN}=1 to allow "
+                "it (only for trusted, imported benchmark tasks)"
+            )
         lim = self.task.limits
         caps: list[str] = []
         for cap in KEPT_CAPABILITIES:
@@ -108,7 +114,7 @@ class Sandbox:
             "--label",
             LABEL,
             "--network",
-            "none",
+            network,
             "--cpus",
             str(lim.cpus),
             "--memory",

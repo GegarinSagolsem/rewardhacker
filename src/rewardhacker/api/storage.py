@@ -91,6 +91,13 @@ def _find_root(dest: Path) -> Path | None:
     return None
 
 
+def _accept(spec: TaskSpec) -> TaskSpec:
+    """Policy for uploaded (untrusted) tasks."""
+    if spec.environment.network != "none":
+        raise BundleError("uploaded tasks can't request network access (environment.network must be 'none')")
+    return spec
+
+
 class BlobBackend(Protocol):
     """Minimal object store: GCS in production, a dict in tests."""
 
@@ -153,14 +160,14 @@ class TaskFiles:
             dest = self.local_dir / org_id / task_id
             try:
                 root = extract_bundle(data, dest)
-                return str(root), TaskSpec.load(root)
+                return str(root), _accept(TaskSpec.load(root))
             except (BundleError, TaskSpecError) as exc:
                 shutil.rmtree(dest, ignore_errors=True)
                 raise type(exc)(str(exc).replace(str(dest), "<bundle>")) from None
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "b"
             try:
-                spec = TaskSpec.load(extract_bundle(data, dest))
+                spec = _accept(TaskSpec.load(extract_bundle(data, dest)))
             except (BundleError, TaskSpecError) as exc:
                 raise type(exc)(str(exc).replace(str(dest), "<bundle>")) from None
         key = f"tasks/{org_id}/{task_id}.zip"

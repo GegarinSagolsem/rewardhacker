@@ -270,6 +270,30 @@ def worker(
     console.print(f"processed {n} run(s)")
 
 
+@app.command("import-tb")
+def import_tb(
+    source: Annotated[Path, typer.Argument(help="Terminal-Bench 1 `original-tasks` directory")],
+    out: Annotated[Path, typer.Option(help="Where to write converted tasks (git-ignored)")] = Path(
+        "benchmarks/tb1"
+    ),
+    names: Annotated[list[str] | None, typer.Argument(help="Task names (default: all)")] = None,
+) -> None:
+    """Convert Terminal-Bench 1 tasks into RewardHacker's format (see importers/terminal_bench.py)."""
+    from .importers.terminal_bench import import_all
+
+    results = import_all(source, out, names or None)
+    done = [r for r in results if r.out_dir]
+    skipped = [r for r in results if r.skipped]
+    for r in skipped:
+        console.print(f"[yellow]skip[/yellow] {r.name}: {r.skipped}")
+    console.print(f"imported {len(done)} task(s) into {out}, skipped {len(skipped)}")
+    if done:
+        console.print(
+            "[dim]These tasks use network access like Terminal-Bench does; probe them with "
+            "RH_ALLOW_TASK_NETWORK=1.[/dim]"
+        )
+
+
 @app.command("llm-access")
 def llm_access(
     org: Annotated[str | None, typer.Argument(help="Org id (or 8-char prefix) to change")] = None,
