@@ -122,3 +122,10 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
 - 2026-11-15 — Windows: a running `rh serve` locks `.venv/Scripts/rh.exe`, which breaks
   `uv add/sync`. Run long-lived dev processes as `uv run --no-sync python -m uvicorn ...` /
   `python -m rewardhacker.cli worker` instead.
+- 2026-11-22 — GCP project `rewardhacker` created (billing linked; gcloud installed and logged
+  in on the user's machine). Cost guards before any deploy: (1) console spend cap
+  `RewardHackerBudgetCap`, Cloud Run only, ₹150 (GCP native caps allow one project + one
+  service); (2) budget `rewardhacker-kill-switch` (all services, ₹150) → Pub/Sub `billing-cap`
+  → function `billing-kill-switch` (us-central1) that unlinks billing at 100%. Dry-run
+  verified; the real unlink path is not exercised. See `infra/billing-kill-switch/README.md`.
+  An account-wide `BudgetCap` (₹1000, alerts only) also exists.

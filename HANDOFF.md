@@ -1,6 +1,6 @@
 # HANDOFF.md — where we left off
 
-_Last updated: 2026-11-15 (end of day-10 session)_
+_Last updated: 2026-11-22 (day 11 in progress: GCP project + cost guards)_
 
 ## State
 
@@ -19,11 +19,13 @@ _Last updated: 2026-11-15 (end of day-10 session)_
   --factory --port 8000` and `uv run --no-sync python -m rewardhacker.cli worker` (see CONTEXT.md:
   `rh.exe` locking on Windows).
 
-## Blocked on the user
+## GCP status (2026-11-22)
 
-- Days 11–12 (GCP deploy) need the user to create a GCP project with billing enabled (free tier
-  only; budget alert ~₹100) and to install/log in to the `gcloud` CLI. Ask before creating
-  anything billable.
+- Project `rewardhacker` exists, billing linked, `gcloud` installed + logged in (in this shell,
+  prepend Machine+User PATH first: the session may predate the install).
+- Cost guards are live: Cloud Run spend cap (₹150) + all-services kill switch (₹150 →
+  unlink billing). See `infra/billing-kill-switch/README.md`. Ask before creating anything
+  outside the free tier.
 
 ## Next steps (in order)
 
