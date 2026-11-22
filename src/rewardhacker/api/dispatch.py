@@ -116,7 +116,16 @@ def dispatcher_from_env() -> Dispatcher:
     image = os.environ.get("RH_WORKER_IMAGE", "").strip()
     if not image:
         return NullDispatcher()
-    env = {"RH_GCS_BUCKET": os.environ.get("RH_GCS_BUCKET", "")}
+    # Workers must enforce the same LLM limits as the API (the spend ledger is shared, the cap
+    # is per-process config), so forward them; unset ones fall back to the worker's defaults.
+    forwarded = (
+        "RH_GCS_BUCKET",
+        "RH_DAILY_BUDGET_USD",
+        "RH_RUN_BUDGET_USD",
+        "RH_MODEL",
+        "RH_ADVERSARY_MAX_STEPS",
+    )
+    env = {k: os.environ.get(k, "") for k in forwarded}
     return CloudBuildDispatcher(
         project=os.environ["RH_GCP_PROJECT"],
         region=os.environ.get("RH_WORKER_REGION", "us-central1"),

@@ -45,6 +45,13 @@ class OrgOut(_Out):
     name: str
     created_at: datetime
     role: Role
+    llm_enabled: bool = False
+
+    @classmethod
+    def from_org(cls, org, role) -> OrgOut:
+        return cls(
+            id=org.id, name=org.name, created_at=org.created_at, role=role, llm_enabled=org.llm_enabled
+        )
 
 
 class MeOut(UserOut):

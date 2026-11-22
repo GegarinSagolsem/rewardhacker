@@ -464,3 +464,67 @@ def test_stuck_running_run_and_run_lists_kick_a_worker(env):
     client.get(f"/api/orgs/{org}/runs", headers=h)  # the list view self-heals too
     assert kicks == [1]
     assert jobs.STALE_AFTER.total_seconds() > 1800  # longer than a worker build's timeout
+
+
+def test_ai_features_need_per_org_approval_on_public_deployment(tmp_path):
+    """Public deployment (RH_NEW_ORGS_LLM=0): new orgs get free static probes only; paid AI
+    endpoints return 403 until the operator enables the org."""
+    from api_helpers import SpecLLM
+    from fastapi.testclient import TestClient
+
+    from rewardhacker.api.app import create_app
+    from rewardhacker.api.db import Base, make_engine, make_sessionmaker
+    from rewardhacker.api.rag import HashEmbedder, MemoryGuidelineIndex
+    from rewardhacker.api.settings import ApiSettings
+    from rewardhacker.api.tables import Org
+
+    engine = make_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    settings = ApiSettings(
+        database_url="sqlite://", jwt_secret="x" * 40, storage_dir=tmp_path / "s", new_orgs_llm=False
+    )
+    client = TestClient(
+        create_app(
+            settings,
+            engine=engine,
+            traces=MemoryTraceStore(),
+            guideline_index=MemoryGuidelineIndex(),
+            embedder=HashEmbedder(),
+            llm_factory=lambda: SpecLLM(),
+        )
+    )
+    h = register(client, "a@x.io")
+    org = client.post("/api/orgs", json={"name": "Stranger"}, headers=h).json()
+    assert org["llm_enabled"] is False
+    task = upload(client, org["id"], h, zip_dir(TASK_DIR)).json()["id"]
+    base = f"/api/orgs/{org['id']}"
+
+    assert client.post(f"{base}/tasks/{task}/runs", json={"include_llm": False}, headers=h).status_code == 202
+    r = client.post(f"{base}/tasks/{task}/runs", json={"include_llm": True}, headers=h)
+    assert r.status_code == 403 and "not enabled" in r.text
+    guideline = {"title": "G", "content": "# A\ntext"}
+    assert client.post(f"{base}/guidelines", json=guideline, headers=h).status_code == 403
+    assert client.post(f"{base}/tasks/{task}/spec-checks", headers=h).status_code == 403
+
+    with make_sessionmaker(engine)() as db:
+        db.get(Org, org["id"]).llm_enabled = True
+        db.commit()
+    assert client.get("/api/auth/me", headers=h).json()["orgs"][0]["llm_enabled"] is True
+    assert client.post(f"{base}/tasks/{task}/runs", json={"include_llm": True}, headers=h).status_code == 202
+
+
+def test_workers_get_the_same_llm_caps_as_the_api(monkeypatch):
+    from rewardhacker.api.dispatch import dispatcher_from_env
+
+    for k, v in {
+        "RH_WORKER_IMAGE": "img",
+        "RH_GCP_PROJECT": "p",
+        "RH_WORKER_SERVICE_ACCOUNT": "w@p",
+        "RH_DAILY_BUDGET_USD": "0.10",
+        "RH_GCS_BUCKET": "b",
+    }.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.delenv("RH_RUN_BUDGET_USD", raising=False)
+    env = dispatcher_from_env().build_spec()["steps"][0]["env"]
+    assert "RH_DAILY_BUDGET_USD=0.10" in env and "RH_GCS_BUCKET=b" in env
+    assert not any(e.startswith("RH_RUN_BUDGET_USD=") for e in env)  # unset → worker default

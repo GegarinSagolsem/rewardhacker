@@ -270,6 +270,43 @@ def worker(
     console.print(f"processed {n} run(s)")
 
 
+@app.command("llm-access")
+def llm_access(
+    org: Annotated[str | None, typer.Argument(help="Org id (or 8-char prefix) to change")] = None,
+    off: Annotated[bool, typer.Option("--off", help="Disable instead of enable")] = False,
+) -> None:
+    """Operator: turn paid AI features on/off for an org, or list orgs (no argument).
+    Uses DATABASE_URL directly, so only whoever holds the database credentials can do this."""
+    _require_api_extra()
+    from sqlalchemy import func, select
+
+    from .api.db import make_engine, make_sessionmaker
+    from .api.settings import get_api_settings
+    from .api.tables import Membership, Org
+
+    sessions = make_sessionmaker(make_engine(get_api_settings().database_url))
+    with sessions() as db:
+        if org is None:
+            rows = db.execute(
+                select(Org, func.count(Membership.user_id))
+                .join(Membership, Membership.org_id == Org.id, isouter=True)
+                .group_by(Org.id)
+                .order_by(Org.created_at)
+            ).all()
+            for o, members in rows:
+                flag = "[green]AI on [/green]" if o.llm_enabled else "[dim]AI off[/dim]"
+                console.print(f"{flag}  {o.id}  {o.name}  ({members} member(s))")
+            return
+        matches = db.scalars(select(Org).where(Org.id.startswith(org))).all()
+        if len(matches) != 1:
+            console.print(f"[red]{len(matches)} orgs match {org!r}; give more of the id[/red]")
+            raise typer.Exit(1)
+        target = matches[0]
+        target.llm_enabled = not off
+        db.commit()
+        console.print(f"AI features {'disabled' if off else 'enabled'} for {target.name} ({target.id})")
+
+
 @app.command("mcp")
 def mcp_cmd() -> None:
     """Run the MCP server on stdio (for Claude Code / Claude Desktop). Needs RH_API_KEY."""

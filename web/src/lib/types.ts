@@ -16,6 +16,8 @@ export interface Org {
   name: string
   created_at: string
   role: Role
+  /** Paid AI features (LLM adversary, guidelines, spec checks) are enabled for this org. */
+  llm_enabled: boolean
 }
 
 export interface Me extends User {

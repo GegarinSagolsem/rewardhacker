@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from ...llm import BudgetExceeded
 from ...taskspec import TaskSpec, TaskSpecError
-from ..deps import Principal, get_db, require_role
+from ..deps import Principal, get_db, require_llm_access, require_role
 from ..rag import chunk_markdown, run_spec_check
 from ..schemas import GuidelineCreate, GuidelineDetail, GuidelineOut, SpecCheckOut
 from ..storage import BundleError
@@ -54,6 +54,7 @@ def add_guideline(
     db: Session = Depends(get_db),
 ) -> Guideline:
     """Add a Markdown guideline document. It is chunked by heading and embedded for retrieval."""
+    require_llm_access(db, org_id)
     embedder = request.app.state.embedder
     if embedder is None:
         raise HTTPException(
@@ -112,6 +113,7 @@ def create_spec_check(
 ) -> SpecCheck:
     """Check the task against the org's guidelines (retrieval + one LLM call, ~$0.001)."""
     task = get_task(db, org_id, task_id)
+    require_llm_access(db, org_id)
     embedder, llm = _need_llm(request)
     try:
         spec = TaskSpec.load(request.app.state.task_files.open(task.storage_path))

@@ -145,6 +145,7 @@ export default function Guidelines() {
         description="Your team's written rules for good RL tasks. A guideline check finds the sections most relevant to a task and asks an LLM which ones the task breaks."
         actions={
           isAdmin &&
+          org.llm_enabled &&
           !adding && (
             <Button onClick={() => setAdding(true)}>
               <Plus className="size-3.5" /> Add guideline
@@ -152,6 +153,12 @@ export default function Guidelines() {
           )
         }
       />
+      {!org.llm_enabled && (
+        <Card className="mb-4 p-4 text-[13px] text-muted">
+          Guidelines and guideline checks use an LLM, which is opt-in per organization on the public demo to keep
+          costs bounded. The static probes are free and always available.
+        </Card>
+      )}
       {adding && <AddGuideline orgId={org.id} onDone={() => setAdding(false)} />}
       <Card>
         {list.isPending ? (

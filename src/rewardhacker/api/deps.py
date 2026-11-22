@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .security import decode_token
-from .tables import ApiKey, AuditEvent, Membership, Role, User, utcnow
+from .tables import ApiKey, AuditEvent, Membership, Org, Role, User, utcnow
 
 _bearer = HTTPBearer(auto_error=False)
 API_KEY_PREFIX = "rh_"
@@ -131,3 +131,16 @@ def require_role(min_role: Role, allow_api_key: bool = True) -> Callable[..., Pr
         return principal
 
     return dep
+
+
+LLM_NOT_ENABLED = (
+    "AI features (the LLM adversary, guidelines and spec checks) are not enabled for this "
+    "organization. The static probes are free and always available."
+)
+
+
+def require_llm_access(db: Session, org_id: str) -> None:
+    """Paid AI features are per-org opt-in (cost control on the public deployment)."""
+    org = db.get(Org, org_id)
+    if org is None or not org.llm_enabled:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, LLM_NOT_ENABLED)

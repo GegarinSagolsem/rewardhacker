@@ -156,3 +156,11 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
   refs/heads/main) → `rh-deployer` (AR writer on the repo, run.developer on the service,
   actAs rh-api). Images tagged by commit SHA; `/api/health` reports `commit`; smoke test, then
   automatic traffic rollback to the previous revision on failure. Docs: `deploy/README.md`.
+- 2026-11-23 — **Gemini cost exposure closed.** The Gemini key lives in project "RewardHack"
+  (`gen-lang-client-0379661206`), outside the ₹150 kill switch. (1) Cloud daily LLM cap $0.10
+  (`RH_DAILY_BUDGET_USD`), now also forwarded to Cloud Build workers (they used the $0.50
+  default). (2) Budget "gemini-key-RewardHack" ₹200/month, alerts 25/50/90/100 % + forecast.
+  (3) Paid AI features (LLM runs, guidelines, spec checks) are per-org opt-in: `orgs.llm_enabled`
+  (migration c4e1a9d27b30, Neon migrated), `RH_NEW_ORGS_LLM=0` on Cloud Run (default on for
+  local dev), 403 otherwise; operator toggles with `rh llm-access [<org-id>] [--off]`. Demo org
+  "Acme RL Environments" enabled. Dashboard greys out AI controls with an explanation.

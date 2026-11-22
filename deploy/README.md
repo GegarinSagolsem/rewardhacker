@@ -40,4 +40,11 @@ gcloud run deploy rewardhacker --region=us-central1 --image=$IMAGES/api:$SHA \
   --update-env-vars=RH_WORKER_IMAGE=$IMAGES/worker:$SHA,RH_GIT_SHA=$SHA
 ```
 
+## Cost controls for the public site
+
+- `RH_DAILY_BUDGET_USD=0.10`: shared daily Gemini cap (Mongo ledger), forwarded to workers.
+- `RH_NEW_ORGS_LLM=0`: new orgs get the free static probes only. Enable AI for an org with
+  `uv run rh llm-access <org-id>` (list orgs: `uv run rh llm-access`; disable: `--off`).
+- Gemini key project "RewardHack" has its own ₹200/month alert budget (outside the kill switch).
+
 Rollback: `gcloud run services update-traffic rewardhacker --region=us-central1 --to-revisions=<rev>=100`.

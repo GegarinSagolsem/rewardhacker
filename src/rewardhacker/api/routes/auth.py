@@ -44,7 +44,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> MeO
         .where(Membership.user_id == user.id)
         .order_by(Org.created_at)
     ).all()
-    orgs = [OrgOut(id=o.id, name=o.name, created_at=o.created_at, role=role) for o, role in rows]
+    orgs = [OrgOut.from_org(o, role) for o, role in rows]
     return MeOut(id=user.id, email=user.email, created_at=user.created_at, orgs=orgs)
 
 

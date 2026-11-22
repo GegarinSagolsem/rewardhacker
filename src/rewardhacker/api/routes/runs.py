@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..deps import Principal, get_db, require_role
+from ..deps import Principal, get_db, require_llm_access, require_role
 from ..jobs import STALE_AFTER
 from ..schemas import RunCreate, RunDetail, RunOut
 from ..tables import Role, Run, RunStatus, utcnow
@@ -57,11 +57,14 @@ def start_run(
 ) -> Run:
     """Queue a probe run. A worker picks it up (started on demand in the cloud)."""
     get_task(db, org_id, task_id)
+    include_llm = (body or RunCreate()).include_llm
+    if include_llm:
+        require_llm_access(db, org_id)
     run = Run(
         org_id=org_id,
         task_id=task_id,
         requested_by=actor.user_id,
-        include_llm=(body or RunCreate()).include_llm,
+        include_llm=include_llm,
         status=RunStatus.QUEUED.value,
     )
     db.add(run)

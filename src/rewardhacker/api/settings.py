@@ -26,6 +26,7 @@ class ApiSettings:
     exports_dir: Path = Path.home() / ".rewardhacker" / "exports"
     gcs_bucket: str | None = None  # set → task bundles + exports go to GCS (V4 signed URLs)
     web_dir: Path | None = None  # built dashboard (web/dist) to serve from the same origin
+    new_orgs_llm: bool = True  # False on the public deployment: paid AI features need approval
 
 
 def get_api_settings() -> ApiSettings:
@@ -52,4 +53,5 @@ def get_api_settings() -> ApiSettings:
         else ApiSettings.exports_dir,
         gcs_bucket=os.environ.get("RH_GCS_BUCKET", "").strip() or None,
         web_dir=Path(os.environ["RH_WEB_DIR"]) if os.environ.get("RH_WEB_DIR") else None,
+        new_orgs_llm=os.environ.get("RH_NEW_ORGS_LLM", "1").lower() not in ("0", "false", "no"),
     )

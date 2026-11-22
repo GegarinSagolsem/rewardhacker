@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -31,8 +31,10 @@ def _ensure_other_admin(db: Session, org_id: str, user_id: str) -> None:
 
 
 @router.post("", response_model=OrgOut, status_code=status.HTTP_201_CREATED)
-def create_org(body: OrgCreate, user: User = Depends(current_user), db: Session = Depends(get_db)) -> OrgOut:
-    org = Org(name=body.name.strip())
+def create_org(
+    body: OrgCreate, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> OrgOut:
+    org = Org(name=body.name.strip(), llm_enabled=request.app.state.settings.new_orgs_llm)
     db.add(org)
     db.flush()
     db.add(Membership(user_id=user.id, org_id=org.id, role=Role.ADMIN.value))
@@ -40,7 +42,7 @@ def create_org(body: OrgCreate, user: User = Depends(current_user), db: Session 
         db, "org.create", "org", org.id, name=org.name
     )
     db.commit()
-    return OrgOut(id=org.id, name=org.name, created_at=org.created_at, role=Role.ADMIN)
+    return OrgOut.from_org(org, Role.ADMIN)
 
 
 @router.get("", response_model=list[OrgOut])
@@ -51,7 +53,7 @@ def list_orgs(user: User = Depends(current_user), db: Session = Depends(get_db))
         .where(Membership.user_id == user.id)
         .order_by(Org.created_at)
     ).all()
-    return [OrgOut(id=o.id, name=o.name, created_at=o.created_at, role=r) for o, r in rows]
+    return [OrgOut.from_org(o, r) for o, r in rows]
 
 
 @router.get("/{org_id}/members", response_model=list[MemberOut])

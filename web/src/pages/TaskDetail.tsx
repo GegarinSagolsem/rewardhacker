@@ -11,12 +11,12 @@ import { atLeast } from '../lib/auth'
 import { reflow, shortId, timeAgo } from '../lib/format'
 import { pollWhileActive, useOrg } from '../lib/org'
 
-function StartRun({ orgId, taskId }: { orgId: string; taskId: string }) {
+function StartRun({ orgId, taskId, aiEnabled }: { orgId: string; taskId: string; aiEnabled: boolean }) {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [llm, setLlm] = useState(false)
   const start = useMutation({
-    mutationFn: () => api.startRun(orgId, taskId, llm),
+    mutationFn: () => api.startRun(orgId, taskId, llm && aiEnabled),
     onSuccess: (run) => {
       qc.invalidateQueries({ queryKey: ['runs', orgId] })
       navigate(`/app/${orgId}/runs/${run.id}`)
@@ -32,13 +32,18 @@ function StartRun({ orgId, taskId }: { orgId: string; taskId: string }) {
       </p>
       <label
         className={clsx(
-          'mt-4 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
-          llm ? 'border-accent/40 bg-accent-soft' : 'border-border hover:bg-surface-2/60',
+          'mt-4 flex items-start gap-3 rounded-lg border p-3 transition-colors',
+          !aiEnabled
+            ? 'cursor-not-allowed border-border opacity-60'
+            : llm
+              ? 'cursor-pointer border-accent/40 bg-accent-soft'
+              : 'cursor-pointer border-border hover:bg-surface-2/60',
         )}
       >
         <input
           type="checkbox"
-          checked={llm}
+          disabled={!aiEnabled}
+          checked={llm && aiEnabled}
           onChange={(e) => setLlm(e.target.checked)}
           className="mt-0.5 size-4 accent-[var(--accent)]"
         />
@@ -47,8 +52,9 @@ function StartRun({ orgId, taskId }: { orgId: string; taskId: string }) {
             <Sparkles className="size-3.5 text-accent" /> Add the LLM adversary
           </span>
           <span className="mt-0.5 block text-xs text-muted">
-            A Gemini agent tries to earn the reward without doing the work, and a judge checks the result. About $0.002
-            per run, hard-capped at $0.05.
+            {aiEnabled
+              ? 'A Gemini agent tries to earn the reward without doing the work, and a judge checks the result. About $0.002 per run, hard-capped at $0.05.'
+              : 'Not enabled for this organization. AI features are opt-in on the public demo to keep costs bounded; the static probes are free.'}
           </span>
         </span>
       </label>
@@ -61,7 +67,7 @@ function StartRun({ orgId, taskId }: { orgId: string; taskId: string }) {
         <Play className="size-3.5" /> Start run
       </Button>
       <p className="mt-2 text-center text-[11px] text-subtle">
-        Runs are queued; a worker (<Mono>rh worker</Mono>) executes them.
+        Runs are queued; a worker (<Mono>rh worker</Mono>, or a cloud build in production) executes them.
       </p>
     </Card>
   )
@@ -129,12 +135,12 @@ export default function TaskDetail() {
             )}
           </Card>
 
-          <SpecCheckPanel orgId={org.id} taskId={taskId} canRun={atLeast(org.role, 'reviewer')} />
+          <SpecCheckPanel orgId={org.id} taskId={taskId} canRun={atLeast(org.role, 'reviewer') && org.llm_enabled} />
         </div>
 
         {atLeast(org.role, 'reviewer') && (
           <div className="lg:sticky lg:top-10 lg:self-start">
-            <StartRun orgId={org.id} taskId={taskId} />
+            <StartRun orgId={org.id} taskId={taskId} aiEnabled={org.llm_enabled} />
           </div>
         )}
       </div>
