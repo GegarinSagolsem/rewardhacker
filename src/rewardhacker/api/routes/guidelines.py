@@ -9,6 +9,7 @@ from ...taskspec import TaskSpec, TaskSpecError
 from ..deps import Principal, get_db, require_role
 from ..rag import chunk_markdown, run_spec_check
 from ..schemas import GuidelineCreate, GuidelineDetail, GuidelineOut, SpecCheckOut
+from ..storage import BundleError
 from ..tables import Guideline, Role, SpecCheck
 from .tasks import get_task
 
@@ -115,8 +116,10 @@ def create_spec_check(
     try:
         spec = TaskSpec.load(request.app.state.task_files.open(task.storage_path))
         result = run_spec_check(spec, org_id, embedder, request.app.state.guidelines, llm)
-    except TaskSpecError as exc:
+    except (TaskSpecError, BundleError) as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    except OSError as exc:  # bundle missing from local disk
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "task bundle is not available") from exc
     except BudgetExceeded as exc:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from None
     check = SpecCheck(

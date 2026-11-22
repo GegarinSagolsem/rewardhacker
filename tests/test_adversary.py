@@ -148,6 +148,37 @@ def test_mongo_spend_ledger_is_shared_and_fails_closed():
         MongoSpendLedger(1.0, "", collection=_FakeSpendCollection(fail=True)).check()
 
 
+def test_mongo_ledger_keeps_spend_when_the_write_fails():
+    from rewardhacker.llm import _UNRECORDED, MongoSpendLedger
+
+    class FlakyWrites(_FakeSpendCollection):
+        broken = True
+
+        def update_one(self, q, update, upsert=False):
+            if self.broken:
+                raise ConnectionError("blip")
+            super().update_one(q, update, upsert)
+
+    _UNRECORDED.clear()
+    col = FlakyWrites()
+    ledger = MongoSpendLedger(0.01, "", collection=col)
+    ledger.record(0.008)  # paid call already happened: must not raise, must still count
+    assert ledger.today() == pytest.approx(0.008)
+    col.broken = False
+    ledger.record(0.001)  # the next write carries the pending amount
+    assert col.docs[ledger._day()]["usd"] == pytest.approx(0.009) and not _UNRECORDED
+
+
+def test_default_ledger_fails_closed_when_mongo_cannot_be_set_up(monkeypatch):
+    pytest.importorskip("pymongo")
+    from rewardhacker.llm import default_ledger
+
+    monkeypatch.setenv("MONGODB_URI", "mongodb+srv://u:p@does-not-exist.invalid/")
+    ledger = default_ledger(1.0)  # must not raise (SRV lookup fails at construction)
+    with pytest.raises(BudgetExceeded, match="unavailable"):
+        ledger.check()
+
+
 def test_pricing():
     assert cost_usd("gemini-3.1-flash-lite", 1_000_000, 0) == pytest.approx(0.25)
     assert cost_usd("gemini-3.1-flash-lite-preview", 0, 1_000_000) == pytest.approx(1.50)

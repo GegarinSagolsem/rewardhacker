@@ -396,3 +396,71 @@ def test_queueing_a_run_kicks_a_worker(env):
         db.commit()
     client.get(f"/api/orgs/{org}/runs/{run['id']}", headers=h)
     assert kicks == [1, 1]  # stuck in the queue: self-heal
+
+
+# --- review fixes (2026-11-22) ----------------------------------------------------------------
+
+
+def test_concurrent_open_of_uncached_bundle_is_safe(tmp_path):
+    import threading
+
+    from rewardhacker.taskspec import TaskSpec
+
+    blobs = MemoryBlobs()
+    path, _ = TaskFiles(tmp_path / "api", bucket="b", blobs=blobs).save("o", "t", zip_dir(TASK_DIR))
+    # Separate TaskFiles objects = separate processes (no shared lock); one = one process's threads.
+    shared = TaskFiles(tmp_path / "cache", bucket="b", blobs=blobs)
+    stores = [shared] * 4 + [TaskFiles(tmp_path / "cache", bucket="b", blobs=blobs) for _ in range(4)]
+    roots, errors = [], []
+
+    def go(store):
+        try:
+            roots.append(store.open(path))
+        except Exception as exc:  # pragma: no cover - the assertion below reports it
+            errors.append(exc)
+
+    threads = [threading.Thread(target=go, args=(s,)) for s in stores]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert not errors and len(set(roots)) == 1
+    assert TaskSpec.load(roots[0]).id == "weak-output-check"
+    assert not [p for p in (tmp_path / "cache" / "tasks" / "o").iterdir() if ".tmp-" in p.name]
+
+
+def test_missing_bundle_is_a_422_not_a_500(env):
+    client, sessions, _ = env
+    h = register(client, "a@x.io")
+    org = make_org(client, h)
+    task = upload(client, org, h, zip_dir(TASK_DIR)).json()["id"]
+    from rewardhacker.api.tables import Task
+
+    with sessions() as db:
+        db.get(Task, task).storage_path = "gs://other-bucket/tasks/x.zip"
+        db.commit()
+    r = client.post(f"/api/orgs/{org}/tasks/{task}/spec-checks", headers=h)
+    assert r.status_code == 422 and "bucket" in r.text
+
+
+def test_stuck_running_run_and_run_lists_kick_a_worker(env):
+    client, sessions, _ = env
+    kicks = []
+    client.app.state.dispatcher.kick = lambda: kicks.append(1)
+    h = register(client, "a@x.io")
+    org = make_org(client, h)
+    task = upload(client, org, h, zip_dir(TASK_DIR)).json()["id"]
+    run = client.post(f"/api/orgs/{org}/tasks/{task}/runs", json={}, headers=h).json()
+    kicks.clear()
+    with sessions() as db:
+        r = db.get(Run, run["id"])
+        r.status, r.started_at = "running", utcnow() - timedelta(minutes=10)
+        db.commit()
+    client.get(f"/api/orgs/{org}/runs", headers=h)
+    assert kicks == []  # running normally
+    with sessions() as db:
+        db.get(Run, run["id"]).started_at = utcnow() - jobs.STALE_AFTER - timedelta(minutes=1)
+        db.commit()
+    client.get(f"/api/orgs/{org}/runs", headers=h)  # the list view self-heals too
+    assert kicks == [1]
+    assert jobs.STALE_AFTER.total_seconds() > 1800  # longer than a worker build's timeout

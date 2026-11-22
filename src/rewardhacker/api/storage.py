@@ -15,6 +15,8 @@ import os
 import shutil
 import stat
 import tempfile
+import threading
+import uuid
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Protocol
@@ -106,7 +108,12 @@ class GCSBlobs:
         self._bucket.blob(key).upload_from_string(data, content_type="application/zip")
 
     def get(self, key: str) -> bytes:
-        return self._bucket.blob(key).download_as_bytes()
+        from google.api_core.exceptions import NotFound
+
+        try:
+            return self._bucket.blob(key).download_as_bytes()
+        except NotFound:
+            raise BundleError(f"task bundle {key!r} is missing from the bucket") from None
 
 
 class MemoryBlobs:
@@ -117,6 +124,8 @@ class MemoryBlobs:
         self.objects[key] = data
 
     def get(self, key: str) -> bytes:
+        if key not in self.objects:
+            raise BundleError(f"task bundle {key!r} is missing from the bucket")
         return self.objects[key]
 
 
@@ -132,6 +141,8 @@ class TaskFiles:
         self.local_dir = local_dir
         self.bucket = bucket
         self._blobs = blobs
+        self._locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
         if bucket and blobs is None:
             self._blobs = GCSBlobs(bucket)
 
@@ -164,12 +175,24 @@ class TaskFiles:
         if bucket != self.bucket or not key.endswith(".zip"):
             raise BundleError(f"task bundle {storage_path!r} is not in the configured bucket")
         dest = self.local_dir.joinpath(*PurePosixPath(key.removesuffix(".zip")).parts)
-        if dest.is_dir() and (root := _find_root(dest)) is not None:
-            return root
-        # Extract next to the final location, then rename: a crash never leaves a half cache.
-        tmp = dest.with_name(f"{dest.name}.tmp{os.getpid()}")
-        shutil.rmtree(tmp, ignore_errors=True)
-        root = extract_bundle(self._blobs.get(key), tmp)
-        shutil.rmtree(dest, ignore_errors=True)
-        tmp.rename(dest)
-        return dest / root.relative_to(tmp)
+        with self._lock_for(key):  # one download per bundle per process (API thread pool)
+            if dest.is_dir() and (root := _find_root(dest)) is not None:
+                return root
+            # Extract into a private temp dir, then rename into place. The rename is atomic, so
+            # `dest` is only ever absent or complete, even across processes or after a crash.
+            tmp = dest.with_name(f"{dest.name}.tmp-{os.getpid()}-{uuid.uuid4().hex[:8]}")
+            try:
+                root = extract_bundle(self._blobs.get(key), tmp)
+                rel = root.relative_to(tmp)
+                try:
+                    tmp.rename(dest)
+                except OSError:
+                    if not dest.is_dir():  # not "another process won the race"
+                        raise
+                return dest / rel
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
+
+    def _lock_for(self, key: str) -> threading.Lock:
+        with self._locks_guard:
+            return self._locks.setdefault(key, threading.Lock())

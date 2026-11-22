@@ -24,7 +24,9 @@ from .traces import TraceStore
 log = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 3
-STALE_AFTER = timedelta(hours=1)
+# Longer than any single run, and longer than a Cloud Build worker's 30-min timeout, so a run
+# still "running" after this has lost its worker.
+STALE_AFTER = timedelta(minutes=40)
 
 ProbeFn = Callable[[TaskSpec, list[str] | None], Report]
 

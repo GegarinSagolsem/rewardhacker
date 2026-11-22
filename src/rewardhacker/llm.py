@@ -7,6 +7,7 @@ fake and the provider can be swapped. ``GeminiLLM`` is the production implementa
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import threading
@@ -83,44 +84,87 @@ class SpendLedger:
             self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
+_UNRECORDED: dict[str, float] = {}  # per UTC day: spend we could not write to MongoDB
+_MONGO_CLIENTS: dict[str, Any] = {}
+_SHARED_LOCK = threading.Lock()
+
+
+def _mongo_client(uri: str):
+    """One client (connection pool + monitor threads) per URI per process."""
+    with _SHARED_LOCK:
+        if uri not in _MONGO_CLIENTS:
+            from pymongo import MongoClient  # optional dependency (extra: api)
+
+            _MONGO_CLIENTS[uri] = MongoClient(uri, serverSelectionTimeoutMS=5000)
+        return _MONGO_CLIENTS[uri]
+
+
 class MongoSpendLedger(SpendLedger):
     """Daily spend shared by every process (Cloud Run instances, per-run Cloud Build workers,
     local CLI): one ``{_id: "YYYY-MM-DD" (UTC), usd}`` document per day, updated with ``$inc``.
-    Fails closed: if MongoDB is unreachable, no LLM call is allowed."""
+
+    Fails closed: if MongoDB can't be read, no LLM call is allowed. A write that fails after a
+    paid call is kept in memory and still counted by ``today()`` in this process (and retried on
+    the next write), so the call's result isn't lost and the cap still holds."""
 
     def __init__(self, daily_cap_usd: float, uri: str, db_name: str = "rewardhacker", collection=None):
         self.daily_cap_usd = daily_cap_usd
-        if collection is None:
-            from pymongo import MongoClient  # optional dependency (extra: api)
-
-            collection = MongoClient(uri, serverSelectionTimeoutMS=5000)[db_name]["llm_spend"]
-        self._col = collection
+        self._col = collection if collection is not None else _mongo_client(uri)[db_name]["llm_spend"]
 
     @staticmethod
     def _day() -> str:
         return datetime.now(UTC).date().isoformat()
 
     def today(self) -> float:
+        day = self._day()
         try:
-            doc = self._col.find_one({"_id": self._day()})
+            doc = self._col.find_one({"_id": day})
         except Exception as exc:
             msg = f"spend ledger unavailable ({type(exc).__name__}); refusing LLM calls"
             raise BudgetExceeded(msg) from exc
-        return float(doc["usd"]) if doc else 0.0
+        with _SHARED_LOCK:
+            pending = _UNRECORDED.get(day, 0.0)
+        return (float(doc["usd"]) if doc else 0.0) + pending
 
     def record(self, usd: float) -> None:
-        self._col.update_one({"_id": self._day()}, {"$inc": {"usd": usd}}, upsert=True)
+        day = self._day()
+        with _SHARED_LOCK:
+            amount = _UNRECORDED.pop(day, 0.0) + usd
+        try:
+            self._col.update_one({"_id": day}, {"$inc": {"usd": amount}}, upsert=True)
+        except Exception:
+            with _SHARED_LOCK:
+                _UNRECORDED[day] = _UNRECORDED.get(day, 0.0) + amount
+            logging.getLogger(__name__).exception(
+                "could not record $%.6f of LLM spend; kept in memory and still counted", amount
+            )
+
+
+class _RefusingLedger(SpendLedger):
+    """Used when the shared ledger can't even be set up: every LLM call is refused."""
+
+    def __init__(self, daily_cap_usd: float, reason: str):
+        self.daily_cap_usd, self._reason = daily_cap_usd, reason
+
+    def today(self) -> float:
+        raise BudgetExceeded(f"spend ledger unavailable ({self._reason}); refusing LLM calls")
+
+    def record(self, usd: float) -> None:  # unreachable: check() always refuses first
+        return None
 
 
 def default_ledger(daily_cap_usd: float) -> SpendLedger:
-    """Shared Mongo ledger when ``MONGODB_URI`` is set (and pymongo installed), else a local file."""
+    """Shared Mongo ledger when ``MONGODB_URI`` is set (and pymongo installed), else a local file.
+    Never raises: an unusable Mongo setup gives a ledger that refuses LLM calls (fail closed)."""
     uri = os.environ.get("MONGODB_URI", "").strip()
-    if uri:
-        try:
-            return MongoSpendLedger(daily_cap_usd, uri, os.environ.get("RH_MONGODB_DB", "rewardhacker"))
-        except ImportError:
-            pass
-    return SpendLedger(daily_cap_usd)
+    if not uri:
+        return SpendLedger(daily_cap_usd)
+    try:
+        return MongoSpendLedger(daily_cap_usd, uri, os.environ.get("RH_MONGODB_DB", "rewardhacker"))
+    except ImportError:
+        return SpendLedger(daily_cap_usd)
+    except Exception as exc:  # e.g. mongodb+srv DNS lookup fails while offline
+        return _RefusingLedger(daily_cap_usd, type(exc).__name__)
 
 
 @dataclass
