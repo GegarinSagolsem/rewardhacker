@@ -1,6 +1,6 @@
 # HANDOFF.md — where we left off
 
-_Last updated: 2026-11-22 (day 11 in progress: GCP project + cost guards)_
+_Last updated: 2026-11-22 (day 11: Cloud Run + Cloud Build workers deployed)_
 
 ## State
 
@@ -21,15 +21,23 @@ _Last updated: 2026-11-22 (day 11 in progress: GCP project + cost guards)_
 
 ## GCP status (2026-11-22)
 
-- Project `rewardhacker` exists, billing linked, `gcloud` installed + logged in (in this shell,
-  prepend Machine+User PATH first: the session may predate the install).
-- Cost guards are live: Cloud Run spend cap (₹150) + all-services kill switch (₹150 →
-  unlink billing). See `infra/billing-kill-switch/README.md`. Ask before creating anything
-  outside the free tier.
+- Live: https://rewardhacker-289475076247.us-central1.run.app (Cloud Run `rewardhacker`,
+  image `api:v4`; API + dashboard). Workers: Cloud Build per run (`worker:v2`), dispatched by
+  the API. Bucket `gs://rewardhacker-data-289475076247`. Secrets in Secret Manager (prod JWT
+  secret is NEW, different from .env). SAs: `rh-api`, `rh-worker`, `billing-kill-switch`.
+- Cost guards + monitoring: see `infra/billing-kill-switch/README.md` (₹150 cap, self-test
+  every 6 h, email alerts).
+- gcloud in this shell: prepend `/c/Users/sagol/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin`.
+- **BLOCKED on the user:** MongoDB Atlas Network Access must allow GCP egress (0.0.0.0/0;
+  M0 has no private endpoints). Until then traces + the LLM spend ledger fail from the cloud,
+  so LLM runs come back `inconclusive` (by design: fail closed). After that: rerun the LLM E2E
+  (scratchpad script `e2e_dispatch.py` → expect EXPLOITABLE + traces).
+- Test data in Neon: a few `e2e-cloud-*@example.com` users + "E2E cloud org".
 
 ## Next steps (in order)
 
-1. Days 11–12: deploy. Plan: Cloud Run (API + static web), e2-micro VM (Docker worker, free
+1. Day 12: CI/CD deploy job (GitHub Actions → build api/worker images → Cloud Run), structured
+   logs/observability, then the Atlas-dependent LLM E2E. (Day 11 deploy done; old plan:) Plan: Cloud Run (API + static web), e2-micro VM (Docker worker, free
    tier), GCS bucket for exports (verify `GCSExportStore` signed URLs for real), Secret Manager
    for keys, Neon + Atlas stay; open Atlas network access for Cloud Run egress; GitHub Actions
    deploy job; basic observability (structured logs, health checks).
