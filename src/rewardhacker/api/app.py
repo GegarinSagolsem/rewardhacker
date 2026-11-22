@@ -6,9 +6,11 @@ Run locally:  uv run rh serve   (or: uvicorn rewardhacker.api.app:create_app --f
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy import Engine
 
 from .. import __version__
@@ -19,6 +21,7 @@ from .exports import ExportStore, GCSExportStore, LocalExportStore
 from .rag import Embedder, GeminiEmbedder, GuidelineIndex, MemoryGuidelineIndex, MongoGuidelineIndex
 from .routes import apikeys, audit, auth, exports, guidelines, orgs, runs, tasks
 from .settings import ApiSettings, get_api_settings
+from .storage import TaskFiles
 from .traces import TraceStore, make_trace_store
 
 
@@ -37,6 +40,7 @@ def create_app(
     guideline_index: GuidelineIndex | None = None,
     embedder: Embedder | None = None,
     llm_factory: Callable[[], LLM | None] | None = None,
+    task_files: TaskFiles | None = None,
 ) -> FastAPI:
     """Build the app. Every external dependency can be injected (tests pass fakes)."""
     settings = settings or get_api_settings()
@@ -57,6 +61,7 @@ def create_app(
             else LocalExportStore(settings.exports_dir, settings.jwt_secret)
         )
     app.state.exports = export_store
+    app.state.task_files = task_files or TaskFiles(settings.storage_dir, settings.gcs_bucket)
     if guideline_index is None:
         guideline_index = (
             MongoGuidelineIndex(settings.mongodb_uri, settings.mongodb_db)
@@ -80,4 +85,26 @@ def create_app(
     def health() -> dict:
         return {"status": "ok", "version": __version__}
 
+    if settings.web_dir is not None:
+        _serve_web(app, settings.web_dir)
     return app
+
+
+def _serve_web(app: FastAPI, web_dir: Path) -> None:
+    """Serve the built dashboard. Unknown non-API paths get index.html (client-side routing);
+    unknown /api paths keep returning JSON 404s."""
+    root = web_dir.resolve()
+    index = root / "index.html"
+    if not index.is_file():
+        raise RuntimeError(f"RH_WEB_DIR={web_dir} has no index.html (run `npm run build` in web/)")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def web(path: str):
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+        file = (root / path).resolve()
+        if path and file.is_file() and file.is_relative_to(root):
+            # Vite fingerprints everything under assets/, so it can be cached forever.
+            cache = "public, max-age=31536000, immutable" if path.startswith("assets/") else "no-cache"
+            return FileResponse(file, headers={"Cache-Control": cache})
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})

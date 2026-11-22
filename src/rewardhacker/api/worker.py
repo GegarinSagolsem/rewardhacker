@@ -10,6 +10,7 @@ import time
 from .db import make_engine, make_sessionmaker
 from .jobs import claim_next, execute, recover_stale
 from .settings import get_api_settings
+from .storage import TaskFiles
 from .traces import make_trace_store
 
 log = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ def run_worker(once: bool = False, poll_seconds: float = 2.0) -> int:
     settings = get_api_settings()
     sessions = make_sessionmaker(make_engine(settings.database_url))
     traces = make_trace_store(settings.mongodb_uri, settings.mongodb_db)
+    task_files = TaskFiles(settings.storage_dir, settings.gcs_bucket)
     worker_id = f"{socket.gethostname()}-{os.getpid()}"
 
     with sessions() as db:
@@ -32,7 +34,7 @@ def run_worker(once: bool = False, poll_seconds: float = 2.0) -> int:
             run = claim_next(db, worker_id)
             if run is not None:
                 log.info("run %s: started (task %s, llm=%s)", run.id, run.task_id, run.include_llm)
-                execute(db, run, traces)
+                execute(db, run, traces, open_task=task_files.open)
                 log.info("run %s: %s %s", run.id, run.status, run.verdict or run.error or "")
                 processed += 1
                 continue

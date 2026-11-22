@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-import shutil
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ...taskspec import TaskSpec, TaskSpecError
+from ...taskspec import TaskSpecError
 from ..deps import Principal, get_db, require_role
 from ..schemas import TaskOut
-from ..storage import BundleError, extract_bundle
+from ..storage import BundleError
 from ..tables import Role, Task, new_id
 
 router = APIRouter(prefix="/api/orgs/{org_id}/tasks", tags=["tasks"])
@@ -40,22 +38,18 @@ def upload_task(
         )
 
     task_id = new_id()
-    dest = settings.storage_dir / org_id / task_id
+    task_files = request.app.state.task_files
     try:
-        root = extract_bundle(data, dest)
-        spec = TaskSpec.load(root)
+        storage_path, spec = task_files.save(org_id, task_id, data)
     except (BundleError, TaskSpecError) as exc:
-        shutil.rmtree(dest, ignore_errors=True)
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc).replace(str(dest), "<bundle>")
-        ) from None
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
 
     task = Task(
         id=task_id,
         org_id=org_id,
         spec_id=spec.id,
         objective=spec.objective.strip(),
-        storage_path=str(root),
+        storage_path=storage_path,
         uploaded_by=actor.user_id,
     )
     db.add(task)

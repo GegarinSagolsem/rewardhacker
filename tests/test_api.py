@@ -23,7 +23,7 @@ from api_helpers import (  # noqa: E402
 
 from rewardhacker.api import jobs  # noqa: E402
 from rewardhacker.api.db import normalize_url  # noqa: E402
-from rewardhacker.api.storage import BundleError, extract_bundle  # noqa: E402
+from rewardhacker.api.storage import BundleError, MemoryBlobs, TaskFiles, extract_bundle  # noqa: E402
 from rewardhacker.api.tables import Run, utcnow  # noqa: E402
 from rewardhacker.api.traces import MemoryTraceStore  # noqa: E402
 
@@ -127,6 +127,30 @@ def test_upload_rejects_bad_bundles(env, data, message):
     org = make_org(client, h)
     r = upload(client, org, h, data)
     assert r.status_code == 422 and message in r.text
+
+
+def test_bucket_task_files_round_trip(tmp_path):
+    """Cloud layout: the API stores the zip in a bucket; the worker extracts it into its cache."""
+    from rewardhacker.taskspec import TaskSpec, TaskSpecError
+
+    blobs = MemoryBlobs()
+    api = TaskFiles(tmp_path / "api", bucket="b", blobs=blobs)
+    path, spec = api.save("org1", "task1", zip_dir(TASK_DIR, prefix="weak-output-check/"))
+    assert path == "gs://b/tasks/org1/task1.zip" and spec.id == "weak-output-check"
+    assert list(blobs.objects) == ["tasks/org1/task1.zip"]
+    assert not (tmp_path / "api").exists()  # validation used a temp dir only
+
+    worker = TaskFiles(tmp_path / "worker", bucket="b", blobs=blobs)
+    root = worker.open(path)
+    assert TaskSpec.load(root).id == "weak-output-check"
+    blobs.objects.clear()
+    assert worker.open(path) == root  # served from the cache, no download
+
+    with pytest.raises(BundleError, match="configured bucket"):
+        worker.open("gs://other/tasks/org1/task1.zip")
+    with pytest.raises(TaskSpecError, match="verifier") as err:
+        api.save("org1", "task2", zip_entries({"task.yaml": b"id: x\n"}))
+    assert str(err.value).startswith("<bundle>")  # no server temp path leaks to the client
 
 
 def test_extract_refuses_zip_slip(tmp_path):
@@ -255,3 +279,30 @@ def test_normalize_url():
     assert normalize_url("postgresql://u:p@h/db?sslmode=require").startswith("postgresql+psycopg://")
     assert normalize_url("postgres://u:p@h/db").startswith("postgresql+psycopg://")
     assert normalize_url("sqlite://") == "sqlite://"
+
+
+def test_serves_dashboard_with_spa_fallback(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from rewardhacker.api.app import create_app
+    from rewardhacker.api.db import Base, make_engine
+    from rewardhacker.api.settings import ApiSettings
+
+    web = tmp_path / "dist"
+    (web / "assets").mkdir(parents=True)
+    (web / "index.html").write_text("<html>app</html>")
+    (web / "assets" / "main-abc.js").write_text("console.log(1)")
+    (tmp_path / "secret.txt").write_text("nope")
+    engine = make_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    settings = ApiSettings(database_url="sqlite://", jwt_secret="x" * 40, web_dir=web)
+    client = TestClient(create_app(settings, engine=engine, traces=MemoryTraceStore()))
+
+    assert client.get("/").text == "<html>app</html>"
+    assert client.get("/runs/abc").text == "<html>app</html>"  # client-side route
+    js = client.get("/assets/main-abc.js")
+    assert js.text == "console.log(1)" and "immutable" in js.headers["cache-control"]
+    assert client.get("/api/health").json()["status"] == "ok"
+    assert client.get("/api/nope").status_code == 404
+    assert client.get("/api/nope").headers["content-type"].startswith("application/json")
+    assert "nope" not in client.get("/../secret.txt").text

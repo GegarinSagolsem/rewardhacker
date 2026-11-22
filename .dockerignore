@@ -1,0 +1,17 @@
+# Never ship secrets or local state into an image.
+.env
+.env.*
+PRIVATE_NOTES.md
+*.report.json
+.git
+.github
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+web/node_modules
+web/dist
+tests
+loopbench
+examples
+infra

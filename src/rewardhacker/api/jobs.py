@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from datetime import timedelta
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -91,13 +92,20 @@ def split_traces(report: Report, run: Run) -> tuple[dict, list[dict]]:
     return data, docs
 
 
-def execute(db: Session, run: Run, traces: TraceStore, probe_fn: ProbeFn = _default_probe) -> Run:
-    """Probe the run's task and store the outcome. Never raises for task-level failures."""
+def execute(
+    db: Session,
+    run: Run,
+    traces: TraceStore,
+    probe_fn: ProbeFn = _default_probe,
+    open_task: Callable[[str], Path] = Path,
+) -> Run:
+    """Probe the run's task and store the outcome. Never raises for task-level failures.
+    ``open_task`` maps ``Task.storage_path`` to a local folder (``TaskFiles.open``)."""
     task_row = db.get(Task, run.task_id)
     try:
         if task_row is None:
             raise RuntimeError("task was deleted")
-        spec = TaskSpec.load(task_row.storage_path)
+        spec = TaskSpec.load(open_task(task_row.storage_path))
         names = None if run.include_llm else [p.name for p in STATIC_PROBES]
         report = probe_fn(spec, names)
     except Exception as exc:

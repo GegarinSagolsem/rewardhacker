@@ -113,7 +113,7 @@ def create_spec_check(
     task = get_task(db, org_id, task_id)
     embedder, llm = _need_llm(request)
     try:
-        spec = TaskSpec.load(task.storage_path)
+        spec = TaskSpec.load(request.app.state.task_files.open(task.storage_path))
         result = run_spec_check(spec, org_id, embedder, request.app.state.guidelines, llm)
     except TaskSpecError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None

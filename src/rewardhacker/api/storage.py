@@ -1,18 +1,25 @@
-"""Safe extraction of uploaded task bundles (.zip).
+"""Uploaded task bundles (.zip): safe extraction and where they live.
 
 Uploads are untrusted: refuse path traversal ("zip slip"), absolute paths, symlinks, zip bombs
-and absurd file counts. Local disk for now; GCS on day 9.
+and absurd file counts.
+
+``TaskFiles`` decides where bundles live. Locally the extracted folder is the source of truth.
+In the cloud the API (Cloud Run) and the worker (VM) share no disk, so the raw zip goes to a
+bucket (``gs://...`` in ``Task.storage_path``) and every reader extracts it into a local cache.
 """
 
 from __future__ import annotations
 
 import io
+import os
 import shutil
 import stat
+import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
+from typing import Protocol
 
-from ..taskspec import TASK_FILE
+from ..taskspec import TASK_FILE, TaskSpec, TaskSpecError
 
 MAX_FILES = 2000
 MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
@@ -66,10 +73,103 @@ def extract_bundle(data: bytes, dest: Path) -> Path:
                 raise
             raise BundleError(f"could not extract archive: {exc}") from exc
 
+    root = _find_root(dest)
+    if root is None:
+        shutil.rmtree(dest, ignore_errors=True)
+        raise BundleError(f"no {TASK_FILE} at the top of the archive (or in a single top-level folder)")
+    return root
+
+
+def _find_root(dest: Path) -> Path | None:
     if (dest / TASK_FILE).is_file():
         return dest
     children = [c for c in dest.iterdir() if c.name != "__MACOSX"]
     if len(children) == 1 and children[0].is_dir() and (children[0] / TASK_FILE).is_file():
         return children[0]
-    shutil.rmtree(dest, ignore_errors=True)
-    raise BundleError(f"no {TASK_FILE} at the top of the archive (or in a single top-level folder)")
+    return None
+
+
+class BlobBackend(Protocol):
+    """Minimal object store: GCS in production, a dict in tests."""
+
+    def put(self, key: str, data: bytes) -> None: ...
+    def get(self, key: str) -> bytes: ...
+
+
+class GCSBlobs:
+    def __init__(self, bucket: str):
+        from google.cloud import storage  # optional dependency (extra: gcs)
+
+        self._bucket = storage.Client().bucket(bucket)
+
+    def put(self, key: str, data: bytes) -> None:
+        self._bucket.blob(key).upload_from_string(data, content_type="application/zip")
+
+    def get(self, key: str) -> bytes:
+        return self._bucket.blob(key).download_as_bytes()
+
+
+class MemoryBlobs:
+    def __init__(self) -> None:
+        self.objects: dict[str, bytes] = {}
+
+    def put(self, key: str, data: bytes) -> None:
+        self.objects[key] = data
+
+    def get(self, key: str) -> bytes:
+        return self.objects[key]
+
+
+class TaskFiles:
+    """Stores uploaded bundles and turns ``Task.storage_path`` back into a local folder.
+
+    Without ``bucket`` bundles are extracted under ``local_dir`` and ``storage_path`` is that
+    folder (dev). With ``bucket`` the zip is stored at ``gs://<bucket>/tasks/<org>/<task>.zip``
+    and ``local_dir`` is only an extraction cache (bundles are immutable, so it never goes stale).
+    """
+
+    def __init__(self, local_dir: Path, bucket: str | None = None, blobs: BlobBackend | None = None):
+        self.local_dir = local_dir
+        self.bucket = bucket
+        self._blobs = blobs
+        if bucket and blobs is None:
+            self._blobs = GCSBlobs(bucket)
+
+    def save(self, org_id: str, task_id: str, data: bytes) -> tuple[str, TaskSpec]:
+        """Validate and store a bundle; returns (storage_path, parsed spec).
+        Raises ``BundleError`` / ``TaskSpecError`` with server paths replaced by ``<bundle>``."""
+        if not self.bucket:
+            dest = self.local_dir / org_id / task_id
+            try:
+                root = extract_bundle(data, dest)
+                return str(root), TaskSpec.load(root)
+            except (BundleError, TaskSpecError) as exc:
+                shutil.rmtree(dest, ignore_errors=True)
+                raise type(exc)(str(exc).replace(str(dest), "<bundle>")) from None
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "b"
+            try:
+                spec = TaskSpec.load(extract_bundle(data, dest))
+            except (BundleError, TaskSpecError) as exc:
+                raise type(exc)(str(exc).replace(str(dest), "<bundle>")) from None
+        key = f"tasks/{org_id}/{task_id}.zip"
+        self._blobs.put(key, data)
+        return f"gs://{self.bucket}/{key}", spec
+
+    def open(self, storage_path: str) -> Path:
+        """Local folder containing task.yaml for a stored task (downloads on first use)."""
+        if not storage_path.startswith("gs://"):
+            return Path(storage_path)
+        bucket, _, key = storage_path.removeprefix("gs://").partition("/")
+        if bucket != self.bucket or not key.endswith(".zip"):
+            raise BundleError(f"task bundle {storage_path!r} is not in the configured bucket")
+        dest = self.local_dir.joinpath(*PurePosixPath(key.removesuffix(".zip")).parts)
+        if dest.is_dir() and (root := _find_root(dest)) is not None:
+            return root
+        # Extract next to the final location, then rename: a crash never leaves a half cache.
+        tmp = dest.with_name(f"{dest.name}.tmp{os.getpid()}")
+        shutil.rmtree(tmp, ignore_errors=True)
+        root = extract_bundle(self._blobs.get(key), tmp)
+        shutil.rmtree(dest, ignore_errors=True)
+        tmp.rename(dest)
+        return dest / root.relative_to(tmp)

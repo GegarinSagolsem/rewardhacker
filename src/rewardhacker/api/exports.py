@@ -73,15 +73,33 @@ class LocalExportStore:
 
 
 class GCSExportStore:
-    """Needs ``google-cloud-storage`` and credentials that can sign (a service account)."""
+    """Needs ``google-cloud-storage`` and service-account credentials.
+
+    On Cloud Run / GCE the runtime credentials have no private key, so signing goes through the
+    IAM ``signBlob`` API (the service account needs ``iam.serviceAccounts.signBlob`` on itself,
+    e.g. Service Account Token Creator). A key-file service account signs locally.
+    """
 
     def __init__(self, bucket: str):
+        import google.auth
         from google.cloud import storage  # optional dependency (extra: gcs)
 
         self._bucket = storage.Client().bucket(bucket)
+        # The storage client's token is scoped to Storage only; signBlob needs cloud-platform.
+        self._credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
 
     def put(self, key: str, data: bytes, content_type: str) -> None:
         self._bucket.blob(key).upload_from_string(data, content_type=content_type)
+
+    def _signing_kwargs(self) -> dict:
+        creds = self._credentials
+        if getattr(creds, "signer", None) is not None:
+            return {"credentials": creds}  # key-file service account: signs locally
+        from google.auth.transport.requests import Request
+
+        if not creds.valid:
+            creds.refresh(Request())
+        return {"service_account_email": creds.service_account_email, "access_token": creds.token}
 
     def link(self, export: Export, ttl: timedelta = LINK_TTL) -> tuple[str, datetime]:
         url = self._bucket.blob(export.object_key).generate_signed_url(
@@ -89,6 +107,7 @@ class GCSExportStore:
             expiration=ttl,
             method="GET",
             response_disposition=f'attachment; filename="{export.filename}"',
+            **self._signing_kwargs(),
         )
         return url, datetime.now(UTC) + ttl
 
