@@ -36,3 +36,63 @@ jobs:
         run: npx eslint src
       - name: Type-check and build
         run: npm run build
+
+  # Continuous deployment: every green push to main ships to Cloud Run. Keyless: GitHub's OIDC
+  # token is exchanged via Workload Identity Federation for the deploy-only `rh-deployer`
+  # service account (allowed only for this repo's main branch). See deploy/README.md.
+  deploy:
+    needs: [test, web]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://rewardhacker-289475076247.us-central1.run.app
+    env:
+      REGION: us-central1
+      SERVICE: rewardhacker
+      IMAGES: us-central1-docker.pkg.dev/rewardhacker/rewardhacker
+      URL: https://rewardhacker-289475076247.us-central1.run.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/289475076247/locations/global/workloadIdentityPools/github/providers/github-repo
+          service_account: rh-deployer@rewardhacker.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build and push images (api + worker)
+        run: |
+          gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+          docker build --target worker -t "$IMAGES/worker:$GITHUB_SHA" .
+          docker build -t "$IMAGES/api:$GITHUB_SHA" .
+          docker push "$IMAGES/worker:$GITHUB_SHA"
+          docker push "$IMAGES/api:$GITHUB_SHA"
+      - name: Remember the live revision (rollback target)
+        run: |
+          echo "PREV_REVISION=$(gcloud run services describe "$SERVICE" --region="$REGION"             --format='value(status.traffic[0].revisionName)')" >> "$GITHUB_ENV"
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "$SERVICE" --region="$REGION" --image="$IMAGES/api:$GITHUB_SHA" --quiet \
+            --update-env-vars="RH_WORKER_IMAGE=$IMAGES/worker:$GITHUB_SHA,RH_GIT_SHA=$GITHUB_SHA"
+      - name: Smoke test (the new commit is live and healthy)
+        run: |
+          for i in 1 2 3 4 5 6; do
+            body=$(curl -fsS "$URL/api/health" || true)
+            echo "$body"
+            if echo "$body" | grep -q "\"commit\":\"$GITHUB_SHA\""; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::health check did not report commit $GITHUB_SHA"
+          exit 1
+      - name: Dashboard is served
+        run: curl -fsS "$URL/" | grep -q '<div id="root">'
+      - name: Roll back to the previous revision
+        if: failure() && env.PREV_REVISION != ''
+        run: |
+          gcloud run services update-traffic "$SERVICE" --region="$REGION" --to-revisions="$PREV_REVISION=100"
+          echo "::error::deploy failed its checks; traffic rolled back to $PREV_REVISION"

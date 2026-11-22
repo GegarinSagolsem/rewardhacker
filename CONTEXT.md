@@ -151,3 +151,8 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
 - 2026-11-22 — Atlas IP access list opened to 0.0.0.0/0 (Cloud Run/Cloud Build have no static
   egress IPs; M0 has no private endpoints; auth still required). Cluster is AWS Mumbai
   (ap-south-1). Final cloud E2E: EXPLOITABLE, trace stored, spend ledger updated.
+- 2026-11-22 — CD: `deploy` job in ci.yml after test+web on pushes to main. Keyless auth via
+  Workload Identity Federation (pool `github`, provider `github-repo`, condition: this repo +
+  refs/heads/main) → `rh-deployer` (AR writer on the repo, run.developer on the service,
+  actAs rh-api). Images tagged by commit SHA; `/api/health` reports `commit`; smoke test, then
+  automatic traffic rollback to the previous revision on failure. Docs: `deploy/README.md`.

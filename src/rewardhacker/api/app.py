@@ -5,6 +5,7 @@ Run locally:  uv run rh serve   (or: uvicorn rewardhacker.api.app:create_app --f
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -86,7 +87,8 @@ def create_app(
 
     @app.get("/api/health", tags=["meta"])
     def health() -> dict:
-        return {"status": "ok", "version": __version__}
+        # RH_GIT_SHA is set by the deploy job: shows exactly which commit is live.
+        return {"status": "ok", "version": __version__, "commit": os.environ.get("RH_GIT_SHA")}
 
     if settings.web_dir is not None:
         _serve_web(app, settings.web_dir)
