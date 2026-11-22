@@ -542,3 +542,39 @@ def test_uploads_cannot_request_network(env, tmp_path):
     (task / "task.yaml").write_text(spec)
     r = upload(client, org, h, zip_dir(task))
     assert r.status_code == 422 and "network" in r.text
+
+
+def test_daily_run_limits_return_429(env):
+    from dataclasses import replace
+
+    client, sessions, _ = env
+    client.app.state.dispatcher.kick = lambda: None
+    client.app.state.settings = replace(
+        client.app.state.settings, runs_per_org_per_day=2, runs_per_day_total=3
+    )
+    h = register(client, "a@x.io")
+    org = make_org(client, h)
+    task = upload(client, org, h, zip_dir(TASK_DIR)).json()["id"]
+    url = f"/api/orgs/{org}/tasks/{task}/runs"
+    assert [client.post(url, json={}, headers=h).status_code for _ in range(2)] == [202, 202]
+    r = client.post(url, json={}, headers=h)
+    assert r.status_code == 429 and "organization" in r.json()["detail"]
+    assert r.headers["Retry-After"] == str(24 * 3600)
+
+    # Runs older than 24 h don't count.
+    with sessions() as db:
+        for run in db.query(Run).filter(Run.org_id == org):
+            run.created_at = utcnow() - timedelta(hours=25)
+        db.commit()
+    assert client.post(url, json={}, headers=h).status_code == 202
+
+    # The service-wide cap applies across orgs.
+    client.app.state.settings = replace(client.app.state.settings, runs_per_org_per_day=0)
+    h2 = register(client, "b@x.io")
+    org2 = make_org(client, h2)
+    task2 = upload(client, org2, h2, zip_dir(TASK_DIR)).json()["id"]
+    url2 = f"/api/orgs/{org2}/tasks/{task2}/runs"
+    assert client.post(url2, json={}, headers=h2).status_code == 202
+    assert client.post(url2, json={}, headers=h2).status_code == 202  # 3 recent in total
+    r = client.post(url2, json={}, headers=h2)
+    assert r.status_code == 429 and "capacity" in r.json()["detail"]

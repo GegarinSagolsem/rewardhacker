@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..deps import Principal, get_db, require_llm_access, require_role
@@ -39,6 +39,29 @@ def _maybe_kick(request: Request, runs: list[Run]) -> None:
         request.app.state.dispatcher.kick()
 
 
+RATE_WINDOW = timedelta(hours=24)
+
+
+def _check_run_limits(db: Session, org_id: str, per_org: int, total: int) -> None:
+    """Cost guard: cap runs per org and across all orgs over a rolling 24 h (0 = no cap).
+    Not a hard lock: two requests racing at the limit can both pass, which is fine for a cap."""
+    since = utcnow() - RATE_WINDOW
+    recent = select(func.count()).select_from(Run).where(Run.created_at >= since)
+    retry = {"Retry-After": str(int(RATE_WINDOW.total_seconds()))}
+    if per_org and db.scalar(recent.where(Run.org_id == org_id)) >= per_org:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Daily run limit reached: this organization can start {per_org} runs per 24 hours.",
+            headers=retry,
+        )
+    if total and db.scalar(recent) >= total:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "The service has reached its daily run capacity. Please try again tomorrow.",
+            headers=retry,
+        )
+
+
 def _get_run(db: Session, org_id: str, run_id: str) -> Run:
     run = db.get(Run, run_id)
     if run is None or run.org_id != org_id:
@@ -60,6 +83,8 @@ def start_run(
     include_llm = (body or RunCreate()).include_llm
     if include_llm:
         require_llm_access(db, org_id)
+    settings = request.app.state.settings
+    _check_run_limits(db, org_id, settings.runs_per_org_per_day, settings.runs_per_day_total)
     run = Run(
         org_id=org_id,
         task_id=task_id,
