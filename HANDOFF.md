@@ -1,6 +1,6 @@
 # HANDOFF.md — where we left off
 
-_Last updated: 2026-11-22 (day 11: Cloud Run + Cloud Build workers deployed)_
+_Last updated: 2026-11-22 (days 11–12 core done: cloud deploy + CD from GitHub Actions)_
 
 ## State
 
@@ -21,8 +21,10 @@ _Last updated: 2026-11-22 (day 11: Cloud Run + Cloud Build workers deployed)_
 
 ## GCP status (2026-11-22)
 
-- Live: https://rewardhacker-289475076247.us-central1.run.app (Cloud Run `rewardhacker`,
-  image `api:v5`; API + dashboard). Workers: Cloud Build per run (`worker:v3`), dispatched by
+- Live: https://rewardhacker-289475076247.us-central1.run.app (Cloud Run `rewardhacker`;
+  API + dashboard). Workers: Cloud Build per run. **Deploys are automatic**: push to main → CI →
+  `deploy` job (images tagged by SHA, `/api/health` shows the live commit, auto-rollback); see
+  `deploy/README.md`, dispatched by
   the API. Bucket `gs://rewardhacker-data-289475076247`. Secrets in Secret Manager (prod JWT
   secret is NEW, different from .env). SAs: `rh-api`, `rh-worker`, `billing-kill-switch`.
 - Cost guards + monitoring: see `infra/billing-kill-switch/README.md` (₹150 cap, self-test
@@ -35,8 +37,9 @@ _Last updated: 2026-11-22 (day 11: Cloud Run + Cloud Build workers deployed)_
 
 ## Next steps (in order)
 
-1. Day 12: CI/CD deploy job (GitHub Actions → build api/worker images → Cloud Run), structured
-   logs/observability, then the Atlas-dependent LLM E2E. (Day 11 deploy done; old plan:) Plan: Cloud Run (API + static web), e2-micro VM (Docker worker, free
+1. Day 12 rest: observability (structured JSON logs for API + worker with run ids, an uptime
+   check / error alert for the API), maybe hide the score on inconclusive runs. Then day 13–14.
+   (Old deploy plan, for reference:) Plan: Cloud Run (API + static web), e2-micro VM (Docker worker, free
    tier), GCS bucket for exports (verify `GCSExportStore` signed URLs for real), Secret Manager
    for keys, Neon + Atlas stay; open Atlas network access for Cloud Run egress; GitHub Actions
    deploy job; basic observability (structured logs, health checks).
