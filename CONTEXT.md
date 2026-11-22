@@ -129,3 +129,22 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
   → function `billing-kill-switch` (us-central1) that unlinks billing at 100%. Dry-run
   verified; the real unlink path is not exercised. See `infra/billing-kill-switch/README.md`.
   An account-wide `BudgetCap` (₹1000, alerts only) also exists.
+- 2026-11-22 — **Worker = Cloud Build per run** (user's choice after weighing JD fit: always-on,
+  ₹0, per-job isolation). An always-on e2-micro was rejected: its external IPv4 (~$3.60/month)
+  is not in the free tier and would trip the ₹150 kill switch. Queueing a run (or viewing one
+  queued >90 s) kicks `rh worker --once --idle-exit 45` as a Cloud Build job (worker image,
+  `rh-worker` SA, secrets via availableSecrets); ≤2 concurrent builds, kicks throttled. Cloud
+  Build free tier: 2,500 min/month on e2-standard-2. Local `rh worker` still works alongside.
+- 2026-11-22 — Cloud Run: one service serves API + dashboard (RH_WEB_DIR); uploads stored as
+  zips in `gs://rewardhacker-data-289475076247/tasks/` and extracted into a local cache by
+  readers (API and worker share no disk). GCS V4 signed export URLs verified live (IAM signBlob
+  with a cloud-platform-scoped token; `rh-api` has TokenCreator on itself only).
+- 2026-11-22 — Daily LLM cap moved to MongoDB (`llm_spend`, one doc per UTC day, `$inc`); the
+  JSON-file ledger silently reset on Cloud Run / per-run builds. Fails closed.
+- 2026-11-22 — **Bug fixed (found in the cloud E2E):** when the adversary could not run (ledger
+  unreachable → budget refusal) the run was reported ROBUST/100. Now `Probe.trial_error` marks
+  such a probe `error`, and any errored probe makes the verdict `inconclusive` (findings still
+  win). Regression tests added.
+- 2026-11-22 — Kill-switch monitoring: error/critical log alert, 6-hourly scheduled self-test
+  (incl. IAM testIamPermissions for deleteBillingAssignment), absence alert after 13 h, all to
+  the owner's email. See `infra/billing-kill-switch/README.md`.

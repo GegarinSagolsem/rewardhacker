@@ -1,15 +1,20 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from datetime import UTC, timedelta
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..deps import Principal, get_db, require_role
 from ..schemas import RunCreate, RunDetail, RunOut
-from ..tables import Role, Run, RunStatus
+from ..tables import Role, Run, RunStatus, utcnow
 from .tasks import get_task
 
 router = APIRouter(prefix="/api/orgs/{org_id}", tags=["runs"])
+
+# A run still queued after this long gets another worker kick when someone looks at it.
+REKICK_AFTER = timedelta(seconds=90)
 
 
 def _get_run(db: Session, org_id: str, run_id: str) -> Run:
@@ -23,11 +28,13 @@ def _get_run(db: Session, org_id: str, run_id: str) -> Run:
 def start_run(
     org_id: str,
     task_id: str,
+    request: Request,
+    background: BackgroundTasks,
     body: RunCreate | None = None,
     actor: Principal = Depends(require_role(Role.REVIEWER)),
     db: Session = Depends(get_db),
 ) -> Run:
-    """Queue a probe run. A worker (`rh worker`) picks it up."""
+    """Queue a probe run. A worker picks it up (started on demand in the cloud)."""
     get_task(db, org_id, task_id)
     run = Run(
         org_id=org_id,
@@ -40,6 +47,7 @@ def start_run(
     db.flush()
     actor.audit(db, "run.start", "run", run.id, task_id=task_id, include_llm=run.include_llm)
     db.commit()
+    background.add_task(request.app.state.dispatcher.kick)  # after the response is sent
     return run
 
 
@@ -66,10 +74,17 @@ def list_runs(
 def read_run(
     org_id: str,
     run_id: str,
+    request: Request,
+    background: BackgroundTasks,
     _: Principal = Depends(require_role(Role.VIEWER)),
     db: Session = Depends(get_db),
 ) -> Run:
-    return _get_run(db, org_id, run_id)
+    run = _get_run(db, org_id, run_id)
+    if run.status == RunStatus.QUEUED.value:
+        created = run.created_at if run.created_at.tzinfo else run.created_at.replace(tzinfo=UTC)
+        if utcnow() - created > REKICK_AFTER:  # self-heal: the worker that was started is gone
+            background.add_task(request.app.state.dispatcher.kick)
+    return run
 
 
 @router.get("/runs/{run_id}/traces")

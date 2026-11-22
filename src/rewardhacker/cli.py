@@ -255,6 +255,9 @@ def serve(
 def worker(
     once: Annotated[bool, typer.Option(help="Exit when the queue is empty")] = False,
     poll: Annotated[float, typer.Option(help="Seconds between queue polls")] = 2.0,
+    idle_exit: Annotated[
+        float, typer.Option(help="With --once: keep polling until idle this many seconds")
+    ] = 0.0,
 ) -> None:
     """Run the probe worker: executes queued runs from the database."""
     _require_api_extra()
@@ -263,7 +266,7 @@ def worker(
     from .api.worker import run_worker
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    n = run_worker(once=once, poll_seconds=poll)
+    n = run_worker(once=once, poll_seconds=poll, idle_exit=idle_exit)
     console.print(f"processed {n} run(s)")
 
 

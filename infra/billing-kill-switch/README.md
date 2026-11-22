@@ -46,3 +46,15 @@ gcloud functions logs read billing-kill-switch --gen2 --region=us-central1 --lim
 ```
 
 The real unlink path has not been exercised (doing so would take the project offline).
+
+## How you find out it failed (monitoring)
+
+| Layer | What | Fires when |
+|---|---|---|
+| Error alert | log alert "Billing kill switch: error or billing disabled" → owner email | the function logs ERROR (it could not cap spend) or CRITICAL (it disabled billing) |
+| Self-test | Cloud Scheduler `kill-switch-selftest`, every 6 h, publishes `{"selfTest": true}`; the function reads billing and asks IAM (`testIamPermissions`) whether it still holds `deleteBillingAssignment` | a failed self-test logs ERROR → error alert |
+| Dead-man's switch | log metric `kill_switch_selftest_ok` + absence alert "self-test missing" | no successful self-test for 13 h (function, trigger, topic or scheduler broken) |
+| Independent | budget emails at 50/90/100 % from Cloud Billing itself | spend crosses ₹75/135/150; a 100 % email while the site is still up = the switch failed |
+
+Alerting is free until at least 2027-09-01, then ~$0.35/condition/month.
+The scheduler's service agent needs `roles/pubsub.publisher` on `billing-cap` (granted).

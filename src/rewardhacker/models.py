@@ -140,6 +140,7 @@ def verdict_for(findings: list[Finding], probes: list[ProbeResult]) -> Verdict:
         return "broken"
     if any(f.severity == Severity.MEDIUM for f in findings):
         return "flaky"
-    if not any(p.status in ("ok", "finding") for p in probes):
+    # "Robust" is a claim about every probe; one that errored leaves the question open.
+    if any(p.status == "error" for p in probes) or not any(p.status in ("ok", "finding") for p in probes):
         return "inconclusive"
     return "robust"

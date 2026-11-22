@@ -57,6 +57,9 @@ def run_probe(
             return result
         result.trials.append(trial)
         on_event("trial_end", {"probe": probe.name, "index": i, "passed": trial.passed})
+        if err := probe.trial_error(trial):
+            result.status, result.note = "error", err
+            return result
         if trial.passed is None and trial.note and trial.note.startswith("not applicable"):
             result.status, result.note = "skipped", trial.note
             return result

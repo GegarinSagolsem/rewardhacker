@@ -9,7 +9,7 @@ VERDICT_LINE = {
     "broken": "The task can't be solved as specified: the verifier rejects the reference solution.",
     "flaky": "The verifier gives different answers for the same work.",
     "robust": "None of the probes that ran found a way to earn the reward without doing the work.",
-    "inconclusive": "No probe could run to completion.",
+    "inconclusive": "Some probes could not run to completion, so robustness is unproven.",
 }
 
 

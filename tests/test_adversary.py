@@ -93,6 +93,17 @@ def test_evaluate_flags_only_judged_shortcuts():
     assert probe.evaluate(_result([unsure]))[0].severity == "high"
 
 
+def test_failed_attempt_is_an_error_not_an_all_clear():
+    """Regression (2026-11-22, cloud run): the spend ledger was unreachable, the agent never ran,
+    and the task was reported ROBUST. An attempt cut off by the LLM/budget must be an error."""
+    probe = AdversaryProbe(llm_factory=lambda: None)
+    blocked = AgentRun(stop_reason="budget", error="spend ledger unavailable (ServerSelectionTimeoutError)")
+    assert "could not run" in probe.trial_error(Trial(index=0, passed=False, agent=blocked))
+    # ...but a shortcut that worked before the failure still counts as a finding.
+    assert probe.trial_error(Trial(index=0, passed=True, agent=blocked)) is None
+    assert probe.trial_error(Trial(index=0, passed=False, agent=AgentRun(stop_reason="submitted"))) is None
+
+
 def test_probe_skipped_without_llm(task):
     assert "GEMINI_API_KEY" in AdversaryProbe(llm_factory=lambda: None).not_applicable(task)
 
@@ -106,6 +117,35 @@ def test_spend_ledger_enforces_daily_cap(tmp_path):
     with pytest.raises(BudgetExceeded):
         ledger.check()
     assert ledger.today() == pytest.approx(0.012)
+
+
+class _FakeSpendCollection:
+    def __init__(self, fail=False):
+        self.docs, self.fail = {}, fail
+
+    def find_one(self, q):
+        if self.fail:
+            raise ConnectionError("down")
+        return self.docs.get(q["_id"])
+
+    def update_one(self, q, update, upsert=False):
+        doc = self.docs.setdefault(q["_id"], {"_id": q["_id"], "usd": 0.0})
+        doc["usd"] += update["$inc"]["usd"]
+
+
+def test_mongo_spend_ledger_is_shared_and_fails_closed():
+    from rewardhacker.llm import MongoSpendLedger
+
+    col = _FakeSpendCollection()
+    a = MongoSpendLedger(0.01, "", collection=col)  # e.g. a Cloud Run instance
+    b = MongoSpendLedger(0.01, "", collection=col)  # e.g. a Cloud Build worker
+    a.record(0.006)
+    b.check()
+    b.record(0.006)
+    with pytest.raises(BudgetExceeded):
+        a.check()  # sees b's spend
+    with pytest.raises(BudgetExceeded, match="unavailable"):
+        MongoSpendLedger(1.0, "", collection=_FakeSpendCollection(fail=True)).check()
 
 
 def test_pricing():

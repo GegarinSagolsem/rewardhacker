@@ -105,6 +105,9 @@ def test_scoring_and_verdicts():
     assert score_findings([_finding(Severity.CRITICAL)] * 3) == 0
     skipped = [ProbeResult(name="n", title="n", expect_pass=False, status="skipped")]
     assert verdict_for([], skipped) == "inconclusive"
+    errored = [*ok, ProbeResult(name="adversary", title="a", expect_pass=False, status="error")]
+    assert verdict_for([], errored) == "inconclusive"  # one probe failed: not provably robust
+    assert verdict_for([_finding(Severity.CRITICAL)], errored) == "exploitable"
 
 
 def test_get_probes():

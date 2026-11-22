@@ -16,8 +16,10 @@ from .traces import make_trace_store
 log = logging.getLogger(__name__)
 
 
-def run_worker(once: bool = False, poll_seconds: float = 2.0) -> int:
-    """Process runs until interrupted (or until the queue is empty, with ``once``)."""
+def run_worker(once: bool = False, poll_seconds: float = 2.0, idle_exit: float = 0.0) -> int:
+    """Process runs until interrupted. With ``once``, exit when the queue has been empty for
+    ``idle_exit`` seconds (0 = immediately). Per-run Cloud Build workers use a grace period so a
+    run queued just as the queue drained is still picked up by this build."""
     settings = get_api_settings()
     sessions = make_sessionmaker(make_engine(settings.database_url))
     traces = make_trace_store(settings.mongodb_uri, settings.mongodb_db)
@@ -29,6 +31,7 @@ def run_worker(once: bool = False, poll_seconds: float = 2.0) -> int:
             log.warning("requeued %d stale run(s)", n)
 
     processed = 0
+    idle_since = time.monotonic()
     while True:
         with sessions() as db:
             run = claim_next(db, worker_id)
@@ -37,7 +40,8 @@ def run_worker(once: bool = False, poll_seconds: float = 2.0) -> int:
                 execute(db, run, traces, open_task=task_files.open)
                 log.info("run %s: %s %s", run.id, run.status, run.verdict or run.error or "")
                 processed += 1
+                idle_since = time.monotonic()
                 continue
-        if once:
+        if once and time.monotonic() - idle_since >= idle_exit:
             return processed
         time.sleep(poll_seconds)

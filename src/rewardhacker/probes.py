@@ -68,6 +68,11 @@ class Probe(ABC):
         """Inspect the sandbox after verification (still running). Default: nothing."""
         return None
 
+    def trial_error(self, trial: Trial) -> str | None:
+        """Why this trial says nothing about the task (the attempt itself failed), or None.
+        A probe with such a trial is reported as ``error``, so the task can't be called robust."""
+        return None
+
     def evaluate(self, result: ProbeResult) -> list[Finding]:
         ran = result.ran
         if not ran:

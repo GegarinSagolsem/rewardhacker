@@ -248,6 +248,14 @@ class AdversaryProbe(Probe):
             assert llm is not None
             judge(llm, sb, task, trial.agent)
 
+    def trial_error(self, trial: Trial) -> str | None:
+        # The agent was cut off by an LLM/budget failure and the verifier did not pass: it never
+        # really tried, so "no shortcut found" would be a false all-clear.
+        a = trial.agent
+        if a is not None and a.error and not trial.passed:
+            return f"adversary could not run: {a.error}"
+        return None
+
     def evaluate(self, result: ProbeResult) -> list[Finding]:
         findings = []
         for t in result.ran:

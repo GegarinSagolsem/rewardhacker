@@ -12,7 +12,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -81,6 +81,46 @@ class SpendLedger:
             data[key] = round(data.get(key, 0.0) + usd, 6)
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+class MongoSpendLedger(SpendLedger):
+    """Daily spend shared by every process (Cloud Run instances, per-run Cloud Build workers,
+    local CLI): one ``{_id: "YYYY-MM-DD" (UTC), usd}`` document per day, updated with ``$inc``.
+    Fails closed: if MongoDB is unreachable, no LLM call is allowed."""
+
+    def __init__(self, daily_cap_usd: float, uri: str, db_name: str = "rewardhacker", collection=None):
+        self.daily_cap_usd = daily_cap_usd
+        if collection is None:
+            from pymongo import MongoClient  # optional dependency (extra: api)
+
+            collection = MongoClient(uri, serverSelectionTimeoutMS=5000)[db_name]["llm_spend"]
+        self._col = collection
+
+    @staticmethod
+    def _day() -> str:
+        return datetime.now(UTC).date().isoformat()
+
+    def today(self) -> float:
+        try:
+            doc = self._col.find_one({"_id": self._day()})
+        except Exception as exc:
+            msg = f"spend ledger unavailable ({type(exc).__name__}); refusing LLM calls"
+            raise BudgetExceeded(msg) from exc
+        return float(doc["usd"]) if doc else 0.0
+
+    def record(self, usd: float) -> None:
+        self._col.update_one({"_id": self._day()}, {"$inc": {"usd": usd}}, upsert=True)
+
+
+def default_ledger(daily_cap_usd: float) -> SpendLedger:
+    """Shared Mongo ledger when ``MONGODB_URI`` is set (and pymongo installed), else a local file."""
+    uri = os.environ.get("MONGODB_URI", "").strip()
+    if uri:
+        try:
+            return MongoSpendLedger(daily_cap_usd, uri, os.environ.get("RH_MONGODB_DB", "rewardhacker"))
+        except ImportError:
+            pass
+    return SpendLedger(daily_cap_usd)
 
 
 @dataclass
@@ -240,4 +280,4 @@ def default_llm(settings: Settings | None = None) -> LLM | None:
     s = settings or get_settings()
     if s.llm_disabled or not s.gemini_api_key:
         return None
-    return GeminiLLM(s.gemini_api_key, s.model, SpendLedger(s.daily_budget_usd))
+    return GeminiLLM(s.gemini_api_key, s.model, default_ledger(s.daily_budget_usd))

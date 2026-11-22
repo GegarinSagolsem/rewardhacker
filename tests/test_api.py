@@ -306,3 +306,93 @@ def test_serves_dashboard_with_spa_fallback(tmp_path):
     assert client.get("/api/nope").status_code == 404
     assert client.get("/api/nope").headers["content-type"].startswith("application/json")
     assert "nope" not in client.get("/../secret.txt").text
+
+
+# --- on-demand worker dispatch (Cloud Build) -------------------------------------------------
+
+
+class _FakeResp:
+    def __init__(self, data):
+        self._data = data
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return self._data
+
+
+class _FakeBuildApi:
+    def __init__(self, statuses):
+        self.statuses, self.created = list(statuses), []
+
+    def get(self, url, params=None, timeout=None):
+        assert params["filter"] == 'tags="rh-worker"'
+        return _FakeResp({"builds": [{"status": s} for s in self.statuses]})
+
+    def post(self, url, json=None, timeout=None):
+        self.created.append(json)
+        self.statuses.append("QUEUED")
+        return _FakeResp({"metadata": {"build": {"id": f"b{len(self.created)}"}}})
+
+
+def _dispatcher(api, **kw):
+    from rewardhacker.api.dispatch import CloudBuildDispatcher
+
+    return CloudBuildDispatcher(
+        project="p",
+        region="us-central1",
+        image="img",
+        service_account="w@p.iam.gserviceaccount.com",
+        secrets={"DATABASE_URL": "database-url"},
+        env={"RH_GCS_BUCKET": "b"},
+        session=api,
+        **kw,
+    )
+
+
+def test_dispatch_caps_concurrent_worker_builds():
+    api = _FakeBuildApi(["SUCCESS", "WORKING"])
+    d = _dispatcher(api, max_concurrent=2, min_interval_s=0)
+    d.kick()  # 1 active -> start one
+    d.kick()  # 2 active -> refuse
+    assert len(api.created) == 1
+    spec = api.created[0]
+    step = spec["steps"][0]
+    assert step["args"][:2] == ["worker", "--once"] and step["secretEnv"] == ["DATABASE_URL"]
+    assert "RH_GCS_BUCKET=b" in step["env"] and spec["tags"] == ["rh-worker"]
+    version = spec["availableSecrets"]["secretManager"][0]["versionName"]
+    assert version.endswith("database-url/versions/latest")
+    assert spec["serviceAccount"].endswith("w@p.iam.gserviceaccount.com")
+
+
+def test_dispatch_throttles_and_never_raises():
+    api = _FakeBuildApi([])
+    d = _dispatcher(api, min_interval_s=60)
+    d.kick()
+    d.kick()  # throttled
+    assert len(api.created) == 1
+
+    class Broken:
+        def get(self, *a, **k):
+            raise ConnectionError("cloud build down")
+
+    _dispatcher(Broken(), min_interval_s=0).kick()  # logged, not raised
+
+
+def test_queueing_a_run_kicks_a_worker(env):
+    client, sessions, _ = env
+    kicks = []
+    client.app.state.dispatcher.kick = lambda: kicks.append(1)
+    h = register(client, "a@x.io")
+    org = make_org(client, h)
+    task = upload(client, org, h, zip_dir(TASK_DIR)).json()["id"]
+    run = client.post(f"/api/orgs/{org}/tasks/{task}/runs", json={}, headers=h).json()
+    assert kicks == [1]
+    client.get(f"/api/orgs/{org}/runs/{run['id']}", headers=h)
+    assert kicks == [1]  # fresh queued run: no re-kick
+    with sessions() as db:
+        db.get(Run, run["id"]).created_at = utcnow() - timedelta(minutes=5)
+        db.commit()
+    client.get(f"/api/orgs/{org}/runs/{run['id']}", headers=h)
+    assert kicks == [1, 1]  # stuck in the queue: self-heal

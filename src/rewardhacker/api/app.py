@@ -15,8 +15,9 @@ from sqlalchemy import Engine
 
 from .. import __version__
 from ..config import get_settings
-from ..llm import LLM, SpendLedger, default_llm
+from ..llm import LLM, default_ledger, default_llm
 from .db import make_engine, make_sessionmaker
+from .dispatch import Dispatcher, dispatcher_from_env
 from .exports import ExportStore, GCSExportStore, LocalExportStore
 from .rag import Embedder, GeminiEmbedder, GuidelineIndex, MemoryGuidelineIndex, MongoGuidelineIndex
 from .routes import apikeys, audit, auth, exports, guidelines, orgs, runs, tasks
@@ -29,7 +30,7 @@ def _default_embedder() -> Embedder | None:
     s = get_settings()
     if s.llm_disabled or not s.gemini_api_key:
         return None
-    return GeminiEmbedder(s.gemini_api_key, SpendLedger(s.daily_budget_usd))
+    return GeminiEmbedder(s.gemini_api_key, default_ledger(s.daily_budget_usd))
 
 
 def create_app(
@@ -41,6 +42,7 @@ def create_app(
     embedder: Embedder | None = None,
     llm_factory: Callable[[], LLM | None] | None = None,
     task_files: TaskFiles | None = None,
+    dispatcher: Dispatcher | None = None,
 ) -> FastAPI:
     """Build the app. Every external dependency can be injected (tests pass fakes)."""
     settings = settings or get_api_settings()
@@ -52,6 +54,7 @@ def create_app(
         description="Red-team your rewards: probe RL coding tasks for loopholes.",
     )
     app.state.settings = settings
+    app.state.dispatcher = dispatcher or dispatcher_from_env()
     app.state.sessionmaker = make_sessionmaker(engine)
     app.state.traces = traces or make_trace_store(settings.mongodb_uri, settings.mongodb_db)
     if export_store is None:
