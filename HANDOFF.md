@@ -22,7 +22,7 @@ _Last updated: 2026-11-22 (day 11: Cloud Run + Cloud Build workers deployed)_
 ## GCP status (2026-11-22)
 
 - Live: https://rewardhacker-289475076247.us-central1.run.app (Cloud Run `rewardhacker`,
-  image `api:v4`; API + dashboard). Workers: Cloud Build per run (`worker:v2`), dispatched by
+  image `api:v5`; API + dashboard). Workers: Cloud Build per run (`worker:v3`), dispatched by
   the API. Bucket `gs://rewardhacker-data-289475076247`. Secrets in Secret Manager (prod JWT
   secret is NEW, different from .env). SAs: `rh-api`, `rh-worker`, `billing-kill-switch`.
 - Cost guards + monitoring: see `infra/billing-kill-switch/README.md` (₹150 cap, self-test
