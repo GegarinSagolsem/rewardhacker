@@ -39,7 +39,7 @@ export function Menu({
         <div
           role="menu"
           className={clsx(
-            'animate-in absolute top-full z-30 mt-1 min-w-56 overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-pop',
+            'animate-in absolute top-full z-30 mt-1.5 min-w-64 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-pop',
             align === 'right' ? 'right-0' : 'left-0',
           )}
         >
@@ -51,10 +51,10 @@ export function Menu({
                 setOpen(false)
                 item.onSelect()
               }}
-              className="flex w-full flex-col items-start rounded-md px-2.5 py-1.5 text-left hover:bg-surface-2"
+              className="flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-surface-2"
             >
-              <span className="text-[13px]">{item.label}</span>
-              {item.hint && <span className="text-[11px] text-muted">{item.hint}</span>}
+              <span className="text-[13.5px] font-medium">{item.label}</span>
+              {item.hint && <span className="text-[12px] text-muted">{item.hint}</span>}
             </button>
           ))}
         </div>

@@ -170,3 +170,11 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
   agent = root, `run-tests.sh` unchanged, network on. New `environment.network: none|bridge`
   (default none); bridge needs `RH_ALLOW_TASK_NETWORK=1` (sandbox guard) and is always refused
   for web uploads. Imported tasks live in git-ignored `benchmarks/` (TB canary: never commit).
+- 2026-11-23 — **Run caps (cost).** `RH_RUNS_PER_ORG_PER_DAY=20` and `RH_RUNS_PER_DAY_TOTAL=100`
+  (rolling 24 h, 429 + Retry-After, 0 = off) so API keys/scripts can't burn Cloud Build minutes.
+  Soft cap: concurrent requests at the limit can both pass.
+- 2026-11-23 — **UI: "Ember" theme.** User picked draft B of three HTML mockups (kept on the
+  Desktop in `rewardhacker-templates/`). Cream `#FBF6EF`, espresso `#2B1D14`, ember `#E8590C`
+  (display/decoration) with `#CC4A0A` for button fills (AA with white text); Sora + Martian Mono
+  via @fontsource; pill buttons, round markers; landing page = hero + ticket, sticky scroll story,
+  verdict strip, ember closer. Dark mode = espresso palette. Frontend only; routes/API unchanged.

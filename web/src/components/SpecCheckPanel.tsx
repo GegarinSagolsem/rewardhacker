@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpenText, ChevronDown, ScanSearch, ShieldCheck, Wrench } from 'lucide-react'
+import clsx from 'clsx'
+import { BookOpenText, ChevronDown, ScanSearch, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { timeAgo, usd } from '../lib/format'
 import type { SpecCheck } from '../lib/types'
-import { Button, Card, ErrorBanner, SeverityBadge, Skeleton } from './ui'
+import { severityTone, toneFill } from './styles'
+import { Button, Card, CardHeader, ErrorBanner, SeverityBadge, Skeleton } from './ui'
 
 const RANK = { high: 0, medium: 1, low: 2 } as const
 
@@ -14,53 +16,56 @@ function Result({ check }: { check: SpecCheck }) {
   const { summary, issues, excerpts } = check.result
   return (
     <div>
-      {summary && <p className="px-4 pt-3 text-[13px]">{summary}</p>}
+      {summary && <p className="px-4 pt-4 text-[14px] leading-relaxed sm:px-5">{summary}</p>}
       {issues.length === 0 ? (
-        <div className="flex items-center gap-2 px-4 py-3 text-[13px] text-muted">
+        <div className="flex items-center gap-2 px-4 py-4 text-[13.5px] text-muted sm:px-5">
           <ShieldCheck className="size-4 text-green" /> No guideline problems found.
         </div>
       ) : (
-        <ul className="grid gap-2 p-4">
-          {[...issues].sort((a, b) => RANK[a.severity] - RANK[b.severity]).map((i, n) => (
-            <li key={n} className="rounded-lg border border-border">
-              <div className="flex flex-wrap items-start gap-2 px-3 pt-2.5">
-                <SeverityBadge severity={i.severity} />
-                <span className="min-w-0 flex-1 text-[13px]">{i.issue}</span>
-              </div>
-              {i.suggestion && (
-                <div className="mt-2 flex gap-2 border-t border-border bg-surface-2/50 px-3 py-2 text-xs">
-                  <Wrench className="mt-0.5 size-3 shrink-0 text-accent" />
-                  <span className="text-muted">{i.suggestion}</span>
+        <ul className="grid gap-2.5 p-4 sm:px-5">
+          {[...issues]
+            .sort((a, b) => RANK[a.severity] - RANK[b.severity])
+            .map((i, n) => (
+              <li key={n} className="relative overflow-hidden rounded-xl border border-border bg-surface">
+                <span aria-hidden className={clsx('absolute inset-y-0 left-0 w-[3px]', toneFill[severityTone[i.severity]])} />
+                <div className="flex flex-wrap items-start gap-2.5 py-3 pr-3.5 pl-4">
+                  <SeverityBadge severity={i.severity} />
+                  <span className="min-w-0 flex-1 text-[13.5px] leading-relaxed">{i.issue}</span>
                 </div>
-              )}
-              {i.heading && (
-                <div className="border-t border-border px-3 py-1.5 text-[11px] text-subtle">
-                  <BookOpenText className="mr-1 inline size-3" />
-                  {i.heading}
-                </div>
-              )}
-            </li>
-          ))}
+                {i.suggestion && (
+                  <div className="flex gap-3 border-t border-border bg-bg py-2.5 pr-3.5 pl-4 text-[13px] leading-relaxed">
+                    <span className="label mt-[3px] shrink-0 text-accent-ink">Fix</span>
+                    <span className="text-muted">{i.suggestion}</span>
+                  </div>
+                )}
+                {i.heading && (
+                  <div className="flex items-center gap-1.5 border-t border-border py-2 pr-3.5 pl-4 text-[12px] text-subtle">
+                    <BookOpenText className="size-3" />
+                    {i.heading}
+                  </div>
+                )}
+              </li>
+            ))}
         </ul>
       )}
       {excerpts.length > 0 && (
         <div className="border-t border-border">
           <button
             onClick={() => setShowExcerpts((v) => !v)}
-            className="flex w-full items-center gap-1.5 px-4 py-2 text-xs text-muted hover:text-fg"
+            className="flex w-full items-center gap-1.5 px-4 py-2.5 text-[12.5px] text-muted hover:text-fg sm:px-5"
             aria-expanded={showExcerpts}
           >
-            <ChevronDown className={`size-3 transition-transform ${showExcerpts ? 'rotate-180' : ''}`} />
+            <ChevronDown className={clsx('size-3.5 transition-transform', showExcerpts && 'rotate-180')} />
             {excerpts.length} guideline excerpts retrieved
           </button>
           {showExcerpts && (
-            <ol className="grid gap-2 px-4 pb-4">
+            <ol className="grid gap-2 px-4 pb-4 sm:px-5">
               {excerpts.map((e) => (
-                <li key={e.n} className="rounded-lg bg-surface-2/60 px-3 py-2">
-                  <div className="text-[11px] font-medium text-muted">
+                <li key={e.n} className="rounded-xl border border-border bg-bg px-3.5 py-2.5">
+                  <div className="label text-muted">
                     [{e.n}] {e.heading || e.title}
                   </div>
-                  <p className="mt-1 line-clamp-4 text-xs whitespace-pre-wrap text-muted">{e.text}</p>
+                  <p className="mt-1.5 line-clamp-4 text-[12.5px] leading-relaxed whitespace-pre-wrap text-muted">{e.text}</p>
                 </li>
               ))}
             </ol>
@@ -82,34 +87,38 @@ export function SpecCheckPanel({ orgId, taskId, canRun }: { orgId: string; taskI
 
   return (
     <Card>
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-        <span className="text-xs font-medium text-muted">Guideline check</span>
-        {latest && (
-          <span className="text-[11px] text-subtle">
-            · {timeAgo(latest.created_at)} by {latest.created_by_label} · {usd(latest.cost_usd)}
-          </span>
-        )}
-        {canRun && (
-          <Button size="sm" variant="secondary" className="ml-auto" onClick={() => run.mutate()} loading={run.isPending}>
-            <ScanSearch className="size-3.5" /> {latest ? 'Check again' : 'Check against guidelines'}
-          </Button>
-        )}
-      </div>
+      <CardHeader
+        title="Guideline check"
+        aside={
+          <>
+            {latest && (
+              <span className="hidden text-[12px] text-subtle sm:inline">
+                {timeAgo(latest.created_at)} · {latest.created_by_label} · {usd(latest.cost_usd)}
+              </span>
+            )}
+            {canRun && (
+              <Button size="sm" variant="secondary" onClick={() => run.mutate()} loading={run.isPending}>
+                {!run.isPending && <ScanSearch />} {latest ? 'Check again' : 'Check against guidelines'}
+              </Button>
+            )}
+          </>
+        }
+      />
       {run.error && (
-        <div className="p-4 pb-0">
+        <div className="px-4 pt-4 sm:px-5">
           <ErrorBanner>{run.error.message}</ErrorBanner>
         </div>
       )}
       {checks.isPending ? (
-        <div className="p-4">
+        <div className="p-4 sm:p-5">
           <Skeleton className="h-12" />
         </div>
       ) : latest ? (
         <Result check={latest} />
       ) : (
-        <p className="px-4 py-4 text-[13px] text-muted">
+        <p className="px-4 py-5 text-[14px] leading-relaxed text-muted sm:px-5">
           Compare this task with your team's{' '}
-          <Link to={`/app/${orgId}/guidelines`} className="text-fg underline decoration-border-strong underline-offset-4">
+          <Link to={`/app/${orgId}/guidelines`} className="text-fg underline decoration-border-strong underline-offset-4 hover:decoration-accent">
             guidelines
           </Link>
           . Finds problems the probes can't see, like hidden requirements or tests that can be hard-coded. About

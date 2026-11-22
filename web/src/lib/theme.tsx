@@ -5,10 +5,11 @@ const KEY = 'rh-theme'
 
 function read(): ThemePref {
   try {
+    // Light is the designed default; "system" and "dark" are opt-in from the theme toggle.
     const v = localStorage.getItem(KEY)
-    return v === 'light' || v === 'dark' ? v : 'system'
+    return v === 'dark' || v === 'system' ? v : 'light'
   } catch {
-    return 'system'
+    return 'light'
   }
 }
 

@@ -1,7 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpenText, ChevronDown, FileUp, Plus, Trash2 } from 'lucide-react'
+import clsx from 'clsx'
+import { BookOpenText, ChevronDown, FileUp, Lock, Plus, Trash2 } from 'lucide-react'
 import { useRef, useState, type FormEvent } from 'react'
-import { Button, Card, EmptyState, ErrorBanner, Field, Input, PageHeader, Skeleton } from '../components/ui'
+import {
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorBanner,
+  Field,
+  Input,
+  Notice,
+  PageHeader,
+  Skeleton,
+  Textarea,
+} from '../components/ui'
 import { api } from '../lib/api'
 import { atLeast } from '../lib/auth'
 import { timeAgo } from '../lib/format'
@@ -28,13 +41,14 @@ function AddGuideline({ orgId, onDone }: { orgId: string; onDone: () => void }) 
   }
 
   return (
-    <Card className="animate-in mb-6 p-4 sm:p-5">
+    <Card className="animate-in mb-6">
+      <CardHeader title="New guideline" />
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault()
           add.mutate()
         }}
-        className="grid gap-4"
+        className="grid gap-5 p-4 sm:p-5"
       >
         <Field label="Title">
           <Input required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task quality guidelines" />
@@ -43,19 +57,19 @@ function AddGuideline({ orgId, onDone }: { orgId: string; onDone: () => void }) 
           label="Content (Markdown)"
           hint="Split into sections by heading and embedded for retrieval. Headings make better excerpts."
         >
-          <textarea
+          <Textarea
             required
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={12}
             placeholder={'# Verifier tests\nTests must check exact values, not just the output format…'}
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-[12px] leading-relaxed shadow-card placeholder:text-subtle hover:border-border-strong focus:border-accent focus:ring-3 focus:ring-accent/15 focus:outline-none"
+            className="font-mono text-[12.5px]"
           />
         </Field>
         {add.error && <ErrorBanner>{add.error.message}</ErrorBanner>}
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
           <Button type="button" variant="ghost" size="sm" onClick={() => file.current?.click()}>
-            <FileUp className="size-3.5" /> Load a .md file
+            <FileUp /> Load a .md file
           </Button>
           <input
             ref={file}
@@ -65,7 +79,7 @@ function AddGuideline({ orgId, onDone }: { orgId: string; onDone: () => void }) 
             onChange={(e) => loadFile(e.target.files?.[0])}
           />
           <div className="flex gap-2">
-            <Button type="button" variant="secondary" onClick={onDone}>
+            <Button variant="secondary" onClick={onDone}>
               Cancel
             </Button>
             <Button type="submit" loading={add.isPending} disabled={!title.trim() || !content.trim()}>
@@ -88,39 +102,40 @@ function GuidelineRow({ orgId, g, canEdit }: { orgId: string; g: Guideline; canE
   })
   return (
     <li className="border-b border-border last:border-0">
-      <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-center gap-3 px-4 py-3.5 sm:px-5">
         <button
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          className="group flex min-w-0 flex-1 items-center gap-3.5 text-left"
         >
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-surface-2 text-muted">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-bg text-muted transition-colors group-hover:text-accent-ink">
             <BookOpenText className="size-4" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-[13px] font-medium">{g.title}</span>
-            <span className="block text-xs text-muted">
-              {g.chunk_count} sections · added {timeAgo(g.created_at)}
+            <span className="block truncate text-[14px] font-medium">{g.title}</span>
+            <span className="mt-0.5 block text-[12.5px] text-muted">
+              <span className="font-mono text-[11.5px]">{g.chunk_count}</span> sections · added {timeAgo(g.created_at)}
             </span>
           </span>
-          <ChevronDown className={`ml-auto size-4 text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+          <ChevronDown className={clsx('ml-auto size-4 shrink-0 text-muted transition-transform', open && 'rotate-180')} />
         </button>
         {canEdit && (
           <Button
             variant="ghost"
             size="sm"
+            className="size-9 px-0"
             aria-label={`Delete ${g.title}`}
             onClick={() => confirm(`Delete "${g.title}"?`) && del.mutate()}
             loading={del.isPending}
           >
-            <Trash2 className="size-3.5" />
+            {!del.isPending && <Trash2 />}
           </Button>
         )}
       </div>
       {open && (
-        <div className="animate-in border-t border-border bg-surface-2/40 px-4 py-3">
+        <div className="animate-in border-t border-border bg-bg px-4 py-4 sm:px-5">
           {detail.data ? (
-            <pre className="max-h-96 overflow-auto font-mono text-[12px] leading-relaxed whitespace-pre-wrap text-muted">
+            <pre className="max-h-96 overflow-auto font-mono text-[12.5px] leading-relaxed whitespace-pre-wrap text-muted">
               {detail.data.content}
             </pre>
           ) : (
@@ -141,6 +156,7 @@ export default function Guidelines() {
   return (
     <div className="animate-in">
       <PageHeader
+        eyebrow="Retrieval-augmented spec checks"
         title="Guidelines"
         description="Your team's written rules for good RL tasks. A guideline check finds the sections most relevant to a task and asks an LLM which ones the task breaks."
         actions={
@@ -148,29 +164,34 @@ export default function Guidelines() {
           org.llm_enabled &&
           !adding && (
             <Button onClick={() => setAdding(true)}>
-              <Plus className="size-3.5" /> Add guideline
+              <Plus /> Add guideline
             </Button>
           )
         }
       />
       {!org.llm_enabled && (
-        <Card className="mb-4 p-4 text-[13px] text-muted">
-          Guidelines and guideline checks use an LLM, which is opt-in per organization on the public demo to keep
-          costs bounded. The static probes are free and always available.
-        </Card>
+        <Notice icon={<Lock />} className="mb-6">
+          <span className="font-medium text-fg">AI features are off for this organization.</span> Guidelines and
+          guideline checks use an LLM, which is opt-in per organization on the public demo to keep costs bounded. The
+          static probes are free and always available.
+        </Notice>
       )}
       {adding && <AddGuideline orgId={org.id} onDone={() => setAdding(false)} />}
       <Card>
+        <CardHeader
+          title="Library"
+          aside={list.data?.length ? <span className="font-mono text-[12px]">{list.data.length}</span> : undefined}
+        />
         {list.isPending ? (
-          <div className="grid gap-3 p-4">
+          <div className="grid gap-3 p-5">
             <Skeleton className="h-10" />
           </div>
         ) : list.error ? (
-          <div className="p-4">
+          <div className="p-5">
             <ErrorBanner>{list.error.message}</ErrorBanner>
           </div>
         ) : list.data.length === 0 ? (
-          <EmptyState icon={<BookOpenText className="size-4" />} title="No guidelines yet">
+          <EmptyState icon={<BookOpenText />} title="No guidelines yet">
             {isAdmin
               ? 'Add your task-writing rules as Markdown. There is an example in examples/guidelines in the repo.'
               : 'An admin can add your team’s task-writing rules here.'}

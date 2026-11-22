@@ -1,6 +1,6 @@
 # HANDOFF.md — where we left off
 
-_Last updated: 2026-11-22 (days 11–12 core done: cloud deploy + CD from GitHub Actions)_
+_Last updated: 2026-11-23 (Ember UI redesign + daily run caps shipped; Day 13 benchmark running)_
 
 ## State
 
@@ -18,6 +18,17 @@ _Last updated: 2026-11-22 (days 11–12 core done: cloud deploy + CD from GitHub
 - Local dev processes: run as `uv run --no-sync python -m uvicorn rewardhacker.api.app:create_app
   --factory --port 8000` and `uv run --no-sync python -m rewardhacker.cli worker` (see CONTEXT.md:
   `rh.exe` locking on Windows).
+
+## Latest (2026-11-23)
+
+- Ember redesign of the whole dashboard shipped (see CONTEXT.md). Local preview stack used for
+  design review: scratchpad `rh-dev/dev_server.py` (SQLite + fakes) on :8000 and Vite on :5173,
+  login `demo@acme-rl.dev` / `demo-password-123` (local only).
+- Daily run caps: 20 per org, 100 total per rolling 24 h (`RH_RUNS_PER_*`).
+- Day 13: static probes on the 40-task TB1 sample (`benchmarks/results/sample.json`, seed
+  20261123) running via `scripts/run_benchmark.py` → `benchmarks/results/static/`. Next: summarise,
+  propose ~20 tasks for the Gemini adversary (user approves spend), verify findings by hand,
+  write RESULTS.md. Root-agent verifier tamper is systemic in TB1: report once.
 
 ## GCP status (2026-11-22)
 

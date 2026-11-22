@@ -1,75 +1,118 @@
 @import 'tailwindcss';
-@import '@fontsource-variable/geist';
-@import '@fontsource-variable/geist-mono';
+@import '@fontsource-variable/sora';
+@import '@fontsource-variable/martian-mono';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Semantic tokens. Components use these names, never raw palette colours. */
+/*
+ * RewardHacker design tokens: "Ember".
+ * Warm cream neutrals, espresso ink for weight, one burnt-orange ember for action and danger.
+ * Components use these semantic names, never raw palette values.
+ * Each colour family has three steps: text (AA on cream and card), fill (dots, bars), soft (tints).
+ * --accent is the button fill (white text passes AA); --ember is the brighter brand orange for
+ * large display type and decoration only.
+ */
 :root {
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --border: #e4e4e7;
-  --border-strong: #d4d4d8;
-  --fg: #18181b;
-  --muted: #71717a;
-  --subtle: #a1a1aa;
-  --accent: #6d28d9;
-  --accent-hover: #5b21b6;
+  --bg: #fbf6ef; /* cream */
+  --surface: #fffcf7; /* card */
+  --surface-2: #f3ebdf; /* sunken / hover */
+  --border: #e7dbcb;
+  --border-strong: #d6c6b1;
+  --fg: #2b1d14; /* espresso */
+  --muted: #6e5b4c;
+  --subtle: #8c7a6c;
+
+  --accent: #cc4a0a;
+  --accent-hover: #b04008;
   --accent-fg: #ffffff;
-  --accent-soft: #f3efff;
-  --ring: #8b5cf6;
+  --accent-ink: #bf4508; /* accent as text on cream */
+  --accent-soft: #fce3d2;
+  --ember: #e8590c;
+  --ring: #e8590c;
 
-  --red: #dc2626;
-  --red-soft: #fef2f2;
-  --orange: #c2410c;
-  --orange-soft: #fff7ed;
-  --amber: #b45309;
-  --amber-soft: #fffbeb;
-  --green: #15803d;
-  --green-soft: #f0fdf4;
-  --blue: #1d4ed8;
-  --blue-soft: #eff6ff;
+  /* An espresso band for emphasis panels and terminals. */
+  --ink: #2b1d14;
+  --ink-2: #3a2a1f;
+  --ink-border: #4a3a2e;
+  --on-ink: #f3ebdf;
+  --on-ink-muted: #a8968a;
 
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 1px rgb(0 0 0 / 0.02);
-  --shadow-pop: 0 8px 24px -6px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.05);
+  /* Verdict + severity families. */
+  --red: #b5301a;
+  --red-fill: #d9381e;
+  --red-soft: #fbe5df;
+  --orange: #a8530a;
+  --orange-fill: #de7b12;
+  --orange-soft: #fcefdc;
+  --yellow: #7f6200;
+  --yellow-fill: #d4a30c;
+  --yellow-soft: #f8efcf;
+  --green: #3f6b3a;
+  --green-fill: #4f7d4a;
+  --green-soft: #e6efe2;
+  --gray: #6e6258;
+  --gray-fill: #a3958a;
+  --gray-soft: #efe8de;
+  --blue: #35588f;
+  --blue-fill: #4a72b3;
+  --blue-soft: #e7edf6;
+
+  --shadow-card: 0 1px 0 var(--border);
+  --shadow-pop: 0 40px 80px -40px rgb(43 29 20 / 0.35), 0 2px 8px rgb(43 29 20 / 0.06);
   color-scheme: light;
 }
 
 .dark {
-  --bg: #09090b;
-  --surface: #111113;
-  --surface-2: #18181b;
-  --border: #232327;
-  --border-strong: #303036;
-  --fg: #fafafa;
-  --muted: #a1a1aa;
-  --subtle: #71717a;
-  --accent: #8b5cf6;
-  --accent-hover: #a78bfa;
+  --bg: #1a120d;
+  --surface: #231913;
+  --surface-2: #2e2219;
+  --border: #3a2c22;
+  --border-strong: #4d3c2f;
+  --fg: #f6eee4;
+  --muted: #b9a797;
+  --subtle: #8f7d6f;
+
+  --accent: #e8590c;
+  --accent-hover: #f26f27;
   --accent-fg: #ffffff;
-  --accent-soft: #1d1530;
-  --ring: #a78bfa;
+  --accent-ink: #ff9a62;
+  --accent-soft: #3a2014;
+  --ember: #ff7a33;
+  --ring: #ff9a62;
 
-  --red: #f87171;
-  --red-soft: #2a1215;
-  --orange: #fb923c;
-  --orange-soft: #2a1a0f;
-  --amber: #fbbf24;
-  --amber-soft: #261d0b;
-  --green: #4ade80;
-  --green-soft: #0f2417;
-  --blue: #60a5fa;
-  --blue-soft: #0f1b2e;
+  --ink: #120c08;
+  --ink-2: #211812;
+  --ink-border: #3a2c22;
+  --on-ink: #f6eee4;
+  --on-ink-muted: #b9a797;
 
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.04);
+  --red: #f4876f;
+  --red-fill: #e9553a;
+  --red-soft: #33170f;
+  --orange: #f3a75f;
+  --orange-fill: #e5891f;
+  --orange-soft: #2f1f0f;
+  --yellow: #e7c45a;
+  --yellow-fill: #d4a30c;
+  --yellow-soft: #2b2210;
+  --green: #a6cf9f;
+  --green-fill: #6e9e68;
+  --green-soft: #1a2617;
+  --gray: #c0b2a6;
+  --gray-fill: #8f7d6f;
+  --gray-soft: #2e2219;
+  --blue: #9bb7e6;
+  --blue-fill: #6b8fcf;
+  --blue-soft: #18202e;
+
+  --shadow-card: 0 1px 0 rgb(0 0 0 / 0.3);
+  --shadow-pop: 0 24px 60px -24px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(255 255 255 / 0.04);
   color-scheme: dark;
 }
 
 @theme inline {
-  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'Geist Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --font-sans: 'Sora Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Martian Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -82,17 +125,33 @@
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
+  --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
+  --color-ember: var(--ember);
   --color-ring: var(--ring);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-border: var(--ink-border);
+  --color-on-ink: var(--on-ink);
+  --color-on-ink-muted: var(--on-ink-muted);
+
   --color-red: var(--red);
+  --color-red-fill: var(--red-fill);
   --color-red-soft: var(--red-soft);
   --color-orange: var(--orange);
+  --color-orange-fill: var(--orange-fill);
   --color-orange-soft: var(--orange-soft);
-  --color-amber: var(--amber);
-  --color-amber-soft: var(--amber-soft);
+  --color-yellow: var(--yellow);
+  --color-yellow-fill: var(--yellow-fill);
+  --color-yellow-soft: var(--yellow-soft);
   --color-green: var(--green);
+  --color-green-fill: var(--green-fill);
   --color-green-soft: var(--green-soft);
+  --color-gray: var(--gray);
+  --color-gray-fill: var(--gray-fill);
+  --color-gray-soft: var(--gray-soft);
   --color-blue: var(--blue);
+  --color-blue-fill: var(--blue-fill);
   --color-blue-soft: var(--blue-soft);
 
   --shadow-card: var(--shadow-card);
@@ -104,17 +163,42 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
   }
   body {
-    @apply bg-bg text-fg font-sans text-sm;
-    font-feature-settings: 'ss01', 'cv11';
+    @apply bg-bg font-sans text-sm text-fg;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
   }
   ::selection {
-    background: color-mix(in srgb, var(--accent) 25%, transparent);
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
   }
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@layer utilities {
+  /* The small spaced-out mono label used for eyebrows, table heads and stat labels. */
+  .label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.2;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  /* A soft ember glow behind hero areas (Ember has no rules or grids). */
+  .bg-graph {
+    background: radial-gradient(60% 70% at 50% 0%, color-mix(in srgb, var(--ember) 9%, transparent), transparent);
   }
 }
 
@@ -130,7 +214,7 @@
 @keyframes rh-fade-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -138,5 +222,5 @@
   }
 }
 .animate-in {
-  animation: rh-fade-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: rh-fade-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
