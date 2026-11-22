@@ -28,10 +28,9 @@ _Last updated: 2026-11-22 (day 11: Cloud Run + Cloud Build workers deployed)_
 - Cost guards + monitoring: see `infra/billing-kill-switch/README.md` (₹150 cap, self-test
   every 6 h, email alerts).
 - gcloud in this shell: prepend `/c/Users/sagol/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin`.
-- **BLOCKED on the user:** MongoDB Atlas Network Access must allow GCP egress (0.0.0.0/0;
-  M0 has no private endpoints). Until then traces + the LLM spend ledger fail from the cloud,
-  so LLM runs come back `inconclusive` (by design: fail closed). After that: rerun the LLM E2E
-  (scratchpad script `e2e_dispatch.py` → expect EXPLOITABLE + traces).
+- Atlas Network Access opened to 0.0.0.0/0 (2026-11-22, by the user). Full cloud E2E passes:
+  upload → Cloud Build worker (auto-dispatched) → weak-output-check EXPLOITABLE, trace in
+  Atlas, $0.0018 recorded in the shared Mongo ledger (`llm_spend`).
 - Test data in Neon: a few `e2e-cloud-*@example.com` users + "E2E cloud org".
 
 ## Next steps (in order)

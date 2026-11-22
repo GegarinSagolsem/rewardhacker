@@ -148,3 +148,6 @@ and task-specific shortcuts found by an LLM adversary. Robustness score + verdic
 - 2026-11-22 — Kill-switch monitoring: error/critical log alert, 6-hourly scheduled self-test
   (incl. IAM testIamPermissions for deleteBillingAssignment), absence alert after 13 h, all to
   the owner's email. See `infra/billing-kill-switch/README.md`.
+- 2026-11-22 — Atlas IP access list opened to 0.0.0.0/0 (Cloud Run/Cloud Build have no static
+  egress IPs; M0 has no private endpoints; auth still required). Cluster is AWS Mumbai
+  (ap-south-1). Final cloud E2E: EXPLOITABLE, trace stored, spend ledger updated.
