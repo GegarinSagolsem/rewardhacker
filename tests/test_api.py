@@ -306,6 +306,11 @@ def test_serves_dashboard_with_spa_fallback(tmp_path):
     assert client.get("/api/nope").status_code == 404
     assert client.get("/api/nope").headers["content-type"].startswith("application/json")
     assert "nope" not in client.get("/../secret.txt").text
+    for path in ("/", "/api/health", "/api/nope"):  # no framing (clickjacking), no sniffing
+        headers = client.get(path).headers
+        assert headers["x-frame-options"] == "DENY"
+        assert headers["content-security-policy"] == "frame-ancestors 'none'"
+        assert headers["x-content-type-options"] == "nosniff"
 
 
 # --- on-demand worker dispatch (Cloud Build) -------------------------------------------------

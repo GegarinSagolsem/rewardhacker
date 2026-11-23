@@ -9,7 +9,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy import Engine
@@ -25,6 +25,16 @@ from .routes import apikeys, audit, auth, exports, guidelines, orgs, runs, tasks
 from .settings import ApiSettings, get_api_settings
 from .storage import TaskFiles
 from .traces import TraceStore, make_trace_store
+
+# The dashboard keeps its session token in localStorage, so a page that framed it would be
+# signed in: forbid framing (clickjacking). Also no MIME sniffing of downloads, and no full URLs
+# in Referer headers sent to other sites.
+SECURITY_HEADERS = {
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "frame-ancestors 'none'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+}
 
 
 def _default_embedder() -> Embedder | None:
@@ -82,6 +92,14 @@ def create_app(
         allow_methods=["*"],
         allow_headers=["Authorization", "Content-Type"],
     )
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        for name, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(name, value)
+        return response
+
     for module in (auth, orgs, tasks, runs, exports, guidelines, apikeys, audit):
         app.include_router(module.router)
 
