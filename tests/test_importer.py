@@ -16,6 +16,7 @@ def _tb_task(
     dockerfile: str = "FROM ghcr.io/laude-institute/t-bench/python-3-13:x\n",
     compose: dict | None = None,
     extra: dict[str, str] | None = None,
+    test_timeout: float = 60.0,
 ) -> Path:
     d = root / name
     (d / "tests").mkdir(parents=True)
@@ -25,7 +26,7 @@ def _tb_task(
                 "instruction": "Write hi to /app/hi.txt",
                 "difficulty": "easy",
                 "category": "file-operations",
-                "max_test_timeout_sec": 60.0,
+                "max_test_timeout_sec": test_timeout,
             }
         ),
         encoding="utf-8",
@@ -72,3 +73,10 @@ def test_reports_why_tasks_are_skipped(tmp_path):
     assert "WORKDIR" in results["no-workdir"].skipped
     assert TaskSpec.load(results["explicit"].out_dir).environment.workdir == "/srv/app"
     assert not (tmp_path / "out" / "two-boxes").exists()
+
+
+def test_long_verifier_timeouts_stay_within_the_schema_limit(tmp_path):
+    src = tmp_path / "original-tasks"
+    _tb_task(src, "slow-tests", test_timeout=3600.0)  # +120 s install headroom would exceed 3600
+    [r] = import_all(src, tmp_path / "out")
+    assert TaskSpec.load(r.out_dir).verifier.timeout_sec == 3600

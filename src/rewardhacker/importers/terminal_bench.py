@@ -151,7 +151,9 @@ def convert(src: Path, out: Path) -> Imported:
         "verifier": {
             # TB runs run-tests.sh in the container's working directory with TEST_DIR set.
             "command": "TEST_DIR=/tests bash /tests/run-tests.sh",
-            "timeout_sec": _clamp(meta.get("max_test_timeout_sec"), 180) + 120,  # + tool install
+            "timeout_sec": min(
+                MAX_TIMEOUT, _clamp(meta.get("max_test_timeout_sec"), 180) + 120
+            ),  # + tool install
             "files": "tests",
             "mount_path": "/tests",
         },
