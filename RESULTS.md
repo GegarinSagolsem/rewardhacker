@@ -8,7 +8,7 @@ below, not counted as findings.
 
 | | |
 |---|---|
-| Benchmark | Terminal-Bench 1, `original-tasks` at commit `d28711d` |
+| Benchmark | Terminal-Bench 1 (github.com/harbor-framework/terminal-bench-1), `original-tasks` at commit `d28711d` |
 | Sample | 40 tasks, stratified by difficulty (10 easy, 20 medium, 10 hard), seed `20261123` |
 | Imported | with `rh import-tb` (single-container tasks only) |
 | Probes | null, reference, rewrite-tests, pytest-forcepass, python-startup-hook, shadow-runner, lingering-process, verifier-file-tamper. No LLM (`--no-llm`) |
