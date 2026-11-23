@@ -49,4 +49,12 @@ gcloud run deploy rewardhacker --region=us-central1 --image=$IMAGES/api:$SHA \
   (HTTP 429) so API keys or scripts can't burn Cloud Build minutes. `0` disables a cap.
 - Gemini key project "RewardHack" has its own ₹200/month alert budget (outside the kill switch).
 
+## Uptime monitoring
+
+- Uptime check `rewardhacker-health`: `GET /api/health` every 5 min from Iowa, Virginia and
+  Europe; passes only if the body contains `"status":"ok"`.
+- Alert policy "RewardHacker site down": emails the owner channel when the check fails from 2+
+  regions for 5 min; auto-closes 30 min after recovery.
+- Both are free (uptime checks have no charge; alerting is free until at least 2027-09-01).
+
 Rollback: `gcloud run services update-traffic rewardhacker --region=us-central1 --to-revisions=<rev>=100`.
