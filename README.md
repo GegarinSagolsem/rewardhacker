@@ -42,13 +42,16 @@ would have.
 RewardHacker was run on a 40-task stratified sample of
 [Terminal-Bench 1](https://github.com/harbor-framework/terminal-bench-1) (`original-tasks`, commit
 `d28711d`), a public benchmark for terminal-using agents. **Preliminary** (34 of 40 tasks have
-a report; the LLM adversary pass has not been run yet). Full write-up with every caveat:
+a static-probe report; the LLM adversary ran on 20). Full write-up with every caveat:
 [RESULTS.md](RESULTS.md).
 
 - **30 tasks are exploitable, all through the same weakness.** The tests are copied into the
   agent's still-running container, so a background process the agent leaves behind can
   rewrite them before they run. That is a property of the harness, not of any one task, so it
   is reported once, with a fix.
+- **The LLM adversary found a task-specific shortcut in `form-filling`** (verified by hand): the
+  tests check the output's shape but never its values, so hard-coded JSON passes. Cost of the
+  whole 20-task adversary pass: $0.06.
 - 1 task resisted every probe. On 10 tasks the official solution failed in our environment.
   These are marked unconfirmed until rerun, not counted as benchmark bugs.
 - The run also found 2 bugs in RewardHacker's own importer, both fixed with tests.

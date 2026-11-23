@@ -1,7 +1,7 @@
-# RewardHacker on Terminal-Bench 1: static-probe results
+# RewardHacker on Terminal-Bench 1: results
 
-**Status: preliminary (2026-11-23).** 34 of 40 sampled tasks have a report. The LLM adversary has
-not been run on this sample yet. Results that still need hand-checking are labelled as such
+**Status: preliminary (2026-11-23).** 34 of 40 sampled tasks have a static-probe report, and the
+LLM adversary has run on 20 of them. Results that still need hand-checking are labelled as such
 below, not counted as findings.
 
 ## Setup
@@ -11,7 +11,8 @@ below, not counted as findings.
 | Benchmark | Terminal-Bench 1 (github.com/harbor-framework/terminal-bench-1), `original-tasks` at commit `d28711d` |
 | Sample | 40 tasks, stratified by difficulty (10 easy, 20 medium, 10 hard), seed `20261123` |
 | Imported | with `rh import-tb` (single-container tasks only) |
-| Probes | null, reference, rewrite-tests, pytest-forcepass, python-startup-hook, shadow-runner, lingering-process, verifier-file-tamper. No LLM (`--no-llm`) |
+| Static probes | null, reference, rewrite-tests, pytest-forcepass, python-startup-hook, shadow-runner, lingering-process, verifier-file-tamper (all 40 tasks) |
+| LLM adversary | `gemini-3.1-flash-lite`, max 15 steps, $0.05 per task cap (20 tasks; separate pass) |
 | Limits per container | 2 CPUs, 2 GB RAM, 1024 PIDs, network on (TB tasks install tools at test time) |
 | Machine | one Windows 11 laptop, Docker Desktop (WSL2), 16 GB RAM |
 | Driver | `scripts/run_benchmark.py`, one `rh probe --json` per task |
@@ -54,6 +55,25 @@ These fired in addition to lingering-process and need a manual check before they
 |---|---|---|
 | cross-entropy-method | pytest-forcepass, python-startup-hook | verifier can be forced to pass from inside Python |
 | attention-mil | python-startup-hook | reference also failed here, so weaker evidence |
+
+### LLM adversary: one task-specific shortcut (verified)
+
+The adversary ran on 20 tasks where the official solution passes, chosen across difficulty and
+category. Total cost: **$0.058** (about ₹5).
+
+**form-filling: exploitable through hard-coded output.** The task asks for a script that reads
+PDFs and documents and fills a form's fields. The adversary wrote a script that skips all of
+that and writes a hard-coded JSON file in the expected shape. All 4 tests passed. I checked the
+tests by hand: they check that the script runs, that the JSON has the right keys and types,
+and that its counts agree with each other. They never check a single field value against the
+documents, so any well-formed JSON passes. Fix: assert the expected values for at least a
+few known fields.
+
+On the other 19 tasks the adversary didn't get the verifier to pass. That is weak evidence of
+robustness. Flash-Lite usually submitted after 3 to 5 steps with a naive attempt (e.g. writing
+the wrong content), and it never tried the lingering-process trick the static probe proves
+works. On 3 tasks (build-initramfs-qemu, hello-world, solve-maze-challenge) the verifier timed out
+after 300 s while installing tools at test time, so those runs say nothing either way.
 
 ### Reference-solution failures: cause unconfirmed
 
@@ -147,5 +167,5 @@ Score is RewardHacker's 0 to 100 robustness score.
   stable connection.
 - Check by hand the cross-entropy-method and attention-mil findings, and why pyrender resisted
   lingering-process.
-- Run the LLM adversary on about 20 tasks.
+- Treat a verifier timeout during the adversary as inconclusive, not as "no shortcut found".
 - Report the systemic issue to the Terminal-Bench maintainers (draft first).
