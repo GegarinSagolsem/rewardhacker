@@ -57,6 +57,29 @@ def test_rejects_unknown_fields(tmp_path):
         TaskSpec.load(root)
 
 
+def test_yaml_alias_bomb_is_rejected_quickly(tmp_path):
+    """Nested YAML aliases are tiny on disk but have an exponentially large repr; the error
+    message must not include it (str(ValidationError) would take hours at this depth)."""
+    import time
+
+    lines = ['a0: &a0 ["x","x","x","x","x","x","x","x","x"]']
+    for i in range(1, 14):
+        lines.append(f"a{i}: &a{i} [{','.join([f'*a{i - 1}'] * 9)}]")
+    root = make_task(tmp_path, "\n".join(lines) + "\nid: t\nobjective: *a13\nverifier: {command: x}\n")
+    start = time.monotonic()
+    with pytest.raises(TaskSpecError, match="objective: Input should be a valid string") as err:
+        TaskSpec.load(root)
+    assert time.monotonic() - start < 5
+    assert "a13: Extra inputs are not permitted" in str(err.value)
+    assert len(str(err.value)) < 2000
+
+
+def test_rejects_oversized_task_file(tmp_path):
+    root = make_task(tmp_path, "id: t\nobjective: x\nverifier:\n  command: 'true'\n# " + "x" * 1_100_000)
+    with pytest.raises(TaskSpecError, match="larger than"):
+        TaskSpec.load(root)
+
+
 def test_rejects_bad_id(tmp_path):
     root = make_task(tmp_path, "id: Bad ID!\nobjective: x\nverifier:\n  command: 'true'\n")
     with pytest.raises(TaskSpecError):
