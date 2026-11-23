@@ -64,6 +64,15 @@ def _read_yaml(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
+def _is_idle_command(command) -> bool:
+    """True for the `sleep infinity` keep-alive TB uses (our containers already start idle)."""
+    if command is None:
+        return True
+    words = command if isinstance(command, list) else [command]
+    text = " ".join(str(w) for w in words).strip()
+    return text in {"sleep infinity", "sh -c sleep infinity"}
+
+
 def _workdir(dockerfile: str, compose_service: dict) -> str:
     if wd := compose_service.get("working_dir"):
         return str(wd)
@@ -94,6 +103,10 @@ def _check(src: Path) -> tuple[dict, dict, str]:
     service = next(iter(services.values())) or {}
     if extra := set(service) - ALLOWED_COMPOSE_KEYS:
         raise Unsupported(f"docker-compose options we don't reproduce: {', '.join(sorted(extra))}")
+    if "command" in service and not _is_idle_command(service["command"]):
+        # We start every container idle; a startup command (e.g. a server the task relies on)
+        # would silently not run, so the task couldn't be reproduced faithfully.
+        raise Unsupported(f"docker-compose startup command we don't run: {service['command']!r}")
     dockerfile = (src / "Dockerfile").read_text(encoding="utf-8")
     if re.search(r"^\s*(COPY|ADD)\s+.*\b(tests|solution\.sh|run-tests\.sh)\b", dockerfile, re.M | re.I):
         raise Unsupported("the Dockerfile copies tests or the solution into the image")

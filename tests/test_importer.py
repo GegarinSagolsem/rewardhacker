@@ -75,6 +75,17 @@ def test_reports_why_tasks_are_skipped(tmp_path):
     assert not (tmp_path / "out" / "two-boxes").exists()
 
 
+def test_startup_commands_are_reproduced_or_the_task_is_skipped(tmp_path):
+    src = tmp_path / "original-tasks"
+    idle = ["sh", "-c", "sleep infinity"]
+    server = ["sh", "-c", "python3 server.py & sleep infinity"]
+    _tb_task(src, "idle", compose={"services": {"client": {"build": {}, "command": idle}}})
+    _tb_task(src, "server", compose={"services": {"client": {"build": {}, "command": server}}})
+    results = {r.name: r for r in import_all(src, tmp_path / "out")}
+    assert results["idle"].skipped is None
+    assert "startup command" in results["server"].skipped
+
+
 def test_long_verifier_timeouts_stay_within_the_schema_limit(tmp_path):
     src = tmp_path / "original-tasks"
     _tb_task(src, "slow-tests", test_timeout=3600.0)  # +120 s install headroom would exceed 3600
