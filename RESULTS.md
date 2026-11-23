@@ -167,5 +167,5 @@ Score is RewardHacker's 0 to 100 robustness score.
   stable connection.
 - Check by hand the cross-entropy-method and attention-mil findings, and why pyrender resisted
   lingering-process.
-- Treat a verifier timeout during the adversary as inconclusive, not as "no shortcut found".
+- Rerun the 3 adversary tasks whose verifier timed out (now reported as errors, fixed in RewardHacker).
 - Report the systemic issue to the Terminal-Bench maintainers (draft first).
