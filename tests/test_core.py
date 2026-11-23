@@ -158,6 +158,25 @@ def test_task_network_needs_operator_opt_in(tmp_path, monkeypatch):
         Sandbox("unused-image", task).__enter__()  # refused before any docker call
 
 
+def test_image_digest_is_unambiguous(tmp_path):
+    """Moving bytes between a file name and its content (or between files) must change the tag,
+    or one org's build could be reused for another org's different task on a shared worker."""
+    from rewardhacker.sandbox import _context_digest
+
+    def digest(files: dict[str, str]) -> str:
+        root = tmp_path / str(len(list(tmp_path.iterdir())))
+        (root / "environment").mkdir(parents=True)
+        for name, text in files.items():
+            (root / "environment" / name).write_text(text)
+        (root / "task.yaml").write_text("id: t\nobjective: x\nverifier:\n  command: 'true'\n")
+        return _context_digest(TaskSpec.load(root))
+
+    a = digest({"Dockerfile": "FROM alpine\n", "ab": "c"})
+    assert a == digest({"Dockerfile": "FROM alpine\n", "ab": "c"})
+    assert a != digest({"Dockerfile": "FROM alpine\n", "a": "bc"})
+    assert len(a) == 32
+
+
 def test_markdown_report_does_not_score_inconclusive_runs():
     from rewardhacker.models import Report
     from rewardhacker.reporting import report_markdown

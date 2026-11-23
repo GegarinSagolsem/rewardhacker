@@ -57,14 +57,22 @@ def check_docker() -> None:
 
 
 def _context_digest(task: TaskSpec) -> str:
+    """Identifies the image a task builds; a matching tag is reused without rebuilding. A worker
+    builds tasks from many orgs on one Docker daemon, so two different contexts must never get
+    the same digest: every field is length-prefixed (no ambiguous concatenations) and the digest
+    is 128 bits (no brute-forced collisions)."""
     h = hashlib.sha256()
-    dockerfile = task.resolve(task.environment.dockerfile)
-    h.update(dockerfile.read_bytes())
+
+    def feed(data: bytes) -> None:
+        h.update(len(data).to_bytes(8, "big"))
+        h.update(data)
+
+    feed(task.resolve(task.environment.dockerfile).read_bytes())
     context = task.resolve(task.environment.context)
     for f in sorted(p for p in context.rglob("*") if p.is_file()):
-        h.update(f.relative_to(context).as_posix().encode())
-        h.update(f.read_bytes())
-    return h.hexdigest()[:12]
+        feed(f.relative_to(context).as_posix().encode())
+        feed(f.read_bytes())
+    return h.hexdigest()[:32]
 
 
 def build_image(task: TaskSpec, timeout: float = 900) -> str:
