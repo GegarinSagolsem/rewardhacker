@@ -64,6 +64,17 @@ def test_short_password_rejected(env):
 # --- orgs and roles -------------------------------------------------------------------------
 
 
+def test_blank_names_rejected(env):
+    client, _, _ = env
+    h = register(client, "a@x.io")
+    assert client.post("/api/orgs", json={"name": "   "}, headers=h).status_code == 422
+    org = make_org(client, h)
+    r = client.post(f"/api/orgs/{org}/api-keys", json={"name": " \t", "role": "viewer"}, headers=h)
+    assert r.status_code == 422
+    r = client.post("/api/orgs", json={"name": "  Acme  "}, headers=h)
+    assert r.status_code == 201 and r.json()["name"] == "Acme"
+
+
 def test_roles_are_enforced(env):
     client, _, _ = env
     admin = register(client, "admin@x.io")

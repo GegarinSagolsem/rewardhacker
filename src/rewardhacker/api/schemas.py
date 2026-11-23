@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from .tables import Role
 
 EMAIL_PATTERN = r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]+$"
+# Names are stripped before the length check, so "   " is rejected instead of stored as "".
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 
 class _Out(BaseModel):
@@ -37,7 +41,7 @@ class UserOut(_Out):
 
 
 class OrgCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+    name: Name
 
 
 class OrgOut(_Out):
@@ -129,7 +133,7 @@ class AuditOut(_Out):
 
 
 class ApiKeyCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+    name: Name
     role: Role = Field(default=Role.REVIEWER, description="viewer or reviewer; keys can't be admins")
 
 
@@ -170,7 +174,7 @@ class ExportLink(ExportOut):
 
 
 class GuidelineCreate(BaseModel):
-    title: str = Field(min_length=1, max_length=200)
+    title: Title
     content: str = Field(min_length=1, max_length=200_000, description="Markdown")
 
 
