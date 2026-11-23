@@ -104,6 +104,10 @@ def execute(
     """Probe the run's task and store the outcome. Never raises for task-level failures.
     ``open_task`` maps ``Task.storage_path`` to a local folder (``TaskFiles.open``)."""
     task_row = db.get(Task, run.task_id)
+    # End the read transaction before probing (up to the worker's 30-minute limit): otherwise the
+    # connection sits "idle in transaction" all that time, which Postgres/Neon may cut, and then
+    # the final commit fails and the finished run is lost and re-run.
+    db.commit()
     try:
         if task_row is None:
             raise RuntimeError("task was deleted")

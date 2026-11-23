@@ -185,16 +185,19 @@ def test_run_lifecycle_with_traces(env):
 
     seen: dict = {}
 
-    def probe_fn(spec, names):
-        seen["names"] = names
-        return fake_report(spec.id)
-
     with sessions() as db:
+
+        def probe_fn(spec, names):
+            seen["names"] = names
+            seen["in_transaction"] = db.in_transaction()
+            return fake_report(spec.id)
+
         run = jobs.claim_next(db, "w1")
         assert run is not None and run.id == run_id and run.status == "running"
         assert jobs.claim_next(db, "w2") is None  # nothing else queued
         jobs.execute(db, run, traces, probe_fn=probe_fn)
     assert seen["names"] is None  # include_llm → all probes
+    assert seen["in_transaction"] is False  # no DB transaction held open while probing
 
     detail = client.get(f"/api/orgs/{org}/runs/{run_id}", headers=h).json()
     assert detail["status"] == "done" and detail["verdict"] == "exploitable" and detail["score"] == 50
