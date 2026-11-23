@@ -254,6 +254,9 @@ class AdversaryProbe(Probe):
         a = trial.agent
         if a is not None and a.error and not trial.passed:
             return f"adversary could not run: {a.error}"
+        # The verifier never finished, so we don't know whether the attempt would have passed.
+        if trial.verify is not None and trial.verify.timed_out:
+            return "verifier timed out after the adversary's attempt"
         return None
 
     def evaluate(self, result: ProbeResult) -> list[Finding]:

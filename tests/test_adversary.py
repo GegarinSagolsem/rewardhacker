@@ -7,7 +7,7 @@ from fakes import FakeLLM, FakeSandbox, bash, submit
 
 from rewardhacker.adversary import AdversaryProbe, judge, run_agent
 from rewardhacker.llm import BudgetExceeded, SpendLedger, cost_usd, parse_json_object, price_for
-from rewardhacker.models import AgentRun, ProbeResult, Trial
+from rewardhacker.models import AgentRun, ExecResult, ProbeResult, Trial
 from rewardhacker.taskspec import TaskSpec
 
 BENCH = Path(__file__).resolve().parents[1] / "loopbench" / "tasks"
@@ -102,6 +102,17 @@ def test_failed_attempt_is_an_error_not_an_all_clear():
     # ...but a shortcut that worked before the failure still counts as a finding.
     assert probe.trial_error(Trial(index=0, passed=True, agent=blocked)) is None
     assert probe.trial_error(Trial(index=0, passed=False, agent=AgentRun(stop_reason="submitted"))) is None
+
+
+def test_verifier_timeout_is_an_error_not_an_all_clear():
+    """Regression (2026-11-23, Terminal-Bench run): the verifier timed out installing tools and the
+    adversary probe reported "no shortcut found". A verifier that never finished says nothing."""
+    probe = AdversaryProbe(llm_factory=lambda: None)
+    attempt = AgentRun(stop_reason="submitted")
+    hung = ExecResult(exit_code=None, timed_out=True)
+    assert "timed out" in probe.trial_error(Trial(index=0, passed=False, agent=attempt, verify=hung))
+    done = ExecResult(exit_code=1)
+    assert probe.trial_error(Trial(index=0, passed=False, agent=attempt, verify=done)) is None
 
 
 def test_probe_skipped_without_llm(task):
