@@ -356,6 +356,13 @@ export function SeverityBadge({ severity, className }: { severity: Severity; cla
 /** Score out of 100 as a number plus a ten-tick gauge in the verdict colour. */
 export function ScoreMeter({ score, verdict }: { score: number | null; verdict: Verdict | null }) {
   if (score == null) return <span className="text-subtle">—</span>
+  // Nothing ran to completion, so a number would only look like a (perfect) result.
+  if (verdict === 'inconclusive')
+    return (
+      <span className="text-subtle" title="Not scored: at least one probe couldn't run to completion">
+        —
+      </span>
+    )
   const fill = toneFill[verdict ? verdictTone[verdict] : 'neutral']
   const on = Math.round(score / 10)
   return (

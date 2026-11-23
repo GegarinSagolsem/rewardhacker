@@ -201,6 +201,7 @@ function VerdictHero({ run, report, orgId, canDownload }: { run: RunDetailT; rep
   const tone = verdictTone[verdict]
   const counted = report.probes.filter((p) => p.status === 'ok' || p.status === 'finding')
   const on = Math.round(report.score / 10)
+  const scored = verdict !== 'inconclusive'
   return (
     <Card className="relative overflow-hidden lg:grid lg:grid-cols-[minmax(0,1fr)_300px]">
       <span aria-hidden className={clsx('absolute inset-x-0 top-0 h-1', toneFill[tone])} />
@@ -228,17 +229,26 @@ function VerdictHero({ run, report, orgId, canDownload }: { run: RunDetailT; rep
       </div>
       <aside className="border-t border-border bg-bg/70 p-5 sm:p-8 lg:border-t-0 lg:border-l">
         <div className="label text-muted">Robustness score</div>
-        <div className="mt-3 flex items-baseline gap-1.5">
-          <span className={clsx('text-[64px] leading-[0.9] font-semibold tracking-[-0.05em] tabular-nums', toneText[tone])}>
-            {report.score}
-          </span>
-          <span className="text-[18px] font-medium text-subtle">/100</span>
-        </div>
-        <div className="mt-4 flex gap-1" aria-hidden>
-          {Array.from({ length: 10 }, (_, i) => (
-            <span key={i} className={clsx('h-2 flex-1 rounded-full', i < on ? toneFill[tone] : 'bg-border')} />
-          ))}
-        </div>
+        {scored ? (
+          <>
+            <div className="mt-3 flex items-baseline gap-1.5">
+              <span className={clsx('text-[64px] leading-[0.9] font-semibold tracking-[-0.05em] tabular-nums', toneText[tone])}>
+                {report.score}
+              </span>
+              <span className="text-[18px] font-medium text-subtle">/100</span>
+            </div>
+            <div className="mt-4 flex gap-1" aria-hidden>
+              {Array.from({ length: 10 }, (_, i) => (
+                <span key={i} className={clsx('h-2 flex-1 rounded-full', i < on ? toneFill[tone] : 'bg-border')} />
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mt-3 text-[64px] leading-[0.9] font-semibold tracking-[-0.05em] text-subtle">—</div>
+            <p className="mt-4 text-[13px] leading-relaxed text-muted">Not scored: at least one probe couldn’t run to completion.</p>
+          </>
+        )}
         <div className="mt-6">
           <StatRow label="Probes ran">
             {counted.length}

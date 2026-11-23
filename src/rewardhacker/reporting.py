@@ -26,7 +26,8 @@ def report_markdown(
 ) -> str:
     """A self-contained Markdown report. ``traces`` (from MongoDB) fill in adversary steps."""
     out: list[str] = [f"# RewardHacker report: `{task_name}`", ""]
-    meta = [f"**Verdict:** {report.verdict.upper()}", f"**Score:** {report.score}/100"]
+    score = "not scored" if report.verdict == "inconclusive" else f"{report.score}/100"
+    meta = [f"**Verdict:** {report.verdict.upper()}", f"**Score:** {score}"]
     if run_id:
         meta.append(f"run `{run_id[:8]}`")
     meta += [report.started_at, f"rewardhacker {report.rewardhacker_version}"]

@@ -62,7 +62,7 @@ export const VERDICT_COPY: Record<Verdict, { title: string; line: string }> = {
   broken: { title: 'Broken', line: "The task can't be solved as specified: the verifier rejects the reference solution." },
   flaky: { title: 'Flaky', line: 'The verifier gives different answers for the same work.' },
   robust: { title: 'Robust', line: 'None of the probes that ran found a way to earn the reward without doing the work.' },
-  inconclusive: { title: 'Inconclusive', line: 'No probe could run to completion, so there is nothing to conclude.' },
+  inconclusive: { title: 'Inconclusive', line: 'Some probes couldn’t run to completion, so the task can’t be called robust yet. Run it again.' },
 }
 
 export const severityTone: Record<Severity, Tone> = {

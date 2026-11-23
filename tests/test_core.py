@@ -133,3 +133,14 @@ def test_task_network_needs_operator_opt_in(tmp_path, monkeypatch):
     monkeypatch.delenv("RH_ALLOW_TASK_NETWORK", raising=False)
     with pytest.raises(DockerError, match="RH_ALLOW_TASK_NETWORK"):
         Sandbox("unused-image", task).__enter__()  # refused before any docker call
+
+
+def test_markdown_report_does_not_score_inconclusive_runs():
+    from rewardhacker.models import Report
+    from rewardhacker.reporting import report_markdown
+
+    base = dict(task_id="t", image="i", rewardhacker_version="0", started_at="now", duration_sec=1.0)
+    unsure = Report(**base, probes=[], findings=[], score=100, verdict="inconclusive")
+    assert "**Score:** not scored" in report_markdown(unsure, task_name="t")
+    clean = Report(**base, probes=[], findings=[], score=100, verdict="robust")
+    assert "**Score:** 100/100" in report_markdown(clean, task_name="t")
