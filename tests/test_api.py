@@ -544,6 +544,23 @@ def test_uploads_cannot_request_network(env, tmp_path):
     assert r.status_code == 422 and "network" in r.text
 
 
+def test_uploads_cannot_have_huge_objectives(env, tmp_path):
+    import shutil
+
+    import yaml
+
+    client, _, _ = env
+    h = register(client, "a@x.io")
+    org = make_org(client, h)
+    task = tmp_path / "t"
+    shutil.copytree(TASK_DIR, task)
+    spec = yaml.safe_load((task / "task.yaml").read_text())
+    spec["objective"] = "word " * 5000  # 25,000 characters
+    (task / "task.yaml").write_text(yaml.safe_dump(spec))
+    r = upload(client, org, h, zip_dir(task))
+    assert r.status_code == 422 and "objective is longer" in r.text
+
+
 def test_daily_run_limits_return_429(env):
     from dataclasses import replace
 

@@ -26,6 +26,9 @@ from ..taskspec import TASK_FILE, TaskSpec, TaskSpecError
 MAX_FILES = 2000
 MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 CHUNK = 64 * 1024
+# The objective is stored in the database, returned in every task list and re-sent on every LLM
+# call of an adversary run; real ones are a few KB.
+MAX_OBJECTIVE_CHARS = 20_000
 
 
 class BundleError(ValueError):
@@ -95,6 +98,8 @@ def _accept(spec: TaskSpec) -> TaskSpec:
     """Policy for uploaded (untrusted) tasks."""
     if spec.environment.network != "none":
         raise BundleError("uploaded tasks can't request network access (environment.network must be 'none')")
+    if len(spec.objective) > MAX_OBJECTIVE_CHARS:
+        raise BundleError(f"the objective is longer than {MAX_OBJECTIVE_CHARS} characters")
     return spec
 
 
