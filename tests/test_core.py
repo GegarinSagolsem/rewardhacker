@@ -177,6 +177,31 @@ def test_image_digest_is_unambiguous(tmp_path):
     assert len(a) == 32
 
 
+def test_command_output_is_captured_with_bounded_memory():
+    """Task code decides how much the verifier / solution / docker build print; the worker must
+    keep only the tail instead of buffering gigabytes."""
+    import sys
+
+    from rewardhacker.sandbox import MAX_OUTPUT_CHARS, _TailBuffer, run_capped
+
+    noisy = "import sys\nfor i in range(20000): sys.stdout.write('x' * 999 + '\\n')\nprint('END')\n"
+    res = run_capped([sys.executable, "-c", noisy], timeout=60)  # ~20 MB of output
+    assert res.returncode == 0 and not res.timed_out
+    assert res.stdout.startswith("...[truncated]...") and res.stdout.rstrip().endswith("END")
+    assert len(res.stdout) <= MAX_OUTPUT_CHARS + 50
+
+    import io
+
+    buf = _TailBuffer()
+    buf.pump(io.BytesIO(b"y" * 10_000_000 + b"tail"))
+    assert buf.dropped and len(buf.data) <= 2 * buf.limit and buf.data.endswith(b"tail")
+
+    res = run_capped(
+        [sys.executable, "-c", "import time; print('hi', flush=True); time.sleep(30)"], timeout=2
+    )
+    assert res.timed_out and res.returncode is None and res.stdout == "hi\n"
+
+
 def test_markdown_report_does_not_score_inconclusive_runs():
     from rewardhacker.models import Report
     from rewardhacker.reporting import report_markdown

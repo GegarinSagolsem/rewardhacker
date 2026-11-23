@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
+import threading
 import time
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 
 from .models import ExecResult
@@ -27,24 +29,71 @@ class DockerError(RuntimeError):
     """Docker failed in a way that is not the task's fault."""
 
 
-def _tail(text: str) -> str:
-    return text if len(text) <= MAX_OUTPUT_CHARS else "...[truncated]...\n" + text[-MAX_OUTPUT_CHARS:]
+def _tail(text: str, truncated: bool = False) -> str:
+    if not truncated and len(text) <= MAX_OUTPUT_CHARS:
+        return text
+    return "...[truncated]...\n" + text[-MAX_OUTPUT_CHARS:]
 
 
-def docker(*args: str, timeout: float | None = 120, check: bool = True) -> subprocess.CompletedProcess:
+class _TailBuffer:
+    """Keeps only the end of a stream. Task code controls what the verifier, the solution and
+    `docker build` print, so buffering all of it could exhaust the worker's memory."""
+
+    def __init__(self, limit: int = MAX_OUTPUT_CHARS * 4):  # 4 bytes per char, worst case
+        self.limit, self.data, self.dropped = limit, bytearray(), False
+
+    def pump(self, stream) -> None:
+        while chunk := stream.read(65536):
+            self.data += chunk
+            if len(self.data) > 2 * self.limit:
+                del self.data[: len(self.data) - self.limit]
+                self.dropped = True
+        stream.close()
+
+    def text(self) -> str:
+        text = self.data.decode("utf-8", errors="replace")
+        # Universal newlines, as subprocess's text mode did before.
+        return _tail(text.replace("\r\n", "\n").replace("\r", "\n"), truncated=self.dropped)
+
+
+@dataclass
+class Captured:
+    returncode: int | None  # None = killed after the timeout
+    stdout: str  # the tail only, see _tail
+    stderr: str
+    timed_out: bool = False
+
+
+def run_capped(argv: list[str], timeout: float | None) -> Captured:
+    """Like ``subprocess.run(argv, capture_output=True, timeout=...)`` with bounded memory. On
+    timeout the process is killed and the output so far is returned (no exception)."""
+    proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = _TailBuffer(), _TailBuffer()
+    pumps = [
+        threading.Thread(target=b.pump, args=(s,), daemon=True)
+        for b, s in ((out, proc.stdout), (err, proc.stderr))
+    ]
+    for t in pumps:
+        t.start()
+    timed_out = False
     try:
-        proc = subprocess.run(
-            ["docker", *args],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-        )
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        timed_out = True
+    for t in pumps:
+        t.join(timeout=10)
+    return Captured(None if timed_out else proc.returncode, out.text(), err.text(), timed_out)
+
+
+def docker(*args: str, timeout: float | None = 120, check: bool = True) -> Captured:
+    try:
+        proc = run_capped(["docker", *args], timeout)
     except FileNotFoundError as exc:
         raise DockerError("docker CLI not found; is Docker installed?") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise DockerError(f"docker {args[0]} timed out after {timeout}s") from exc
+    if proc.timed_out:
+        raise DockerError(f"docker {args[0]} timed out after {timeout}s")
     if check and proc.returncode != 0:
         raise DockerError(f"docker {' '.join(args[:2])} failed: {proc.stderr.strip()[-2000:]}")
     return proc
@@ -164,28 +213,11 @@ class Sandbox:
         if user:
             args += ["-u", user]
         start = time.monotonic()
-        try:
-            proc = subprocess.run(
-                [*args, self.name, "sh", "-c", command],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout,
-            )
-        except subprocess.TimeoutExpired as exc:
-            out = exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else exc.stdout
-            err = exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else exc.stderr
-            return ExecResult(
-                exit_code=None,
-                stdout=_tail(out or ""),
-                stderr=_tail(err or ""),
-                timed_out=True,
-                duration_sec=round(time.monotonic() - start, 3),
-            )
+        proc = run_capped([*args, self.name, "sh", "-c", command], timeout)
         return ExecResult(
             exit_code=proc.returncode,
-            stdout=_tail(proc.stdout),
-            stderr=_tail(proc.stderr),
+            stdout=proc.stdout,
+            stderr=proc.stderr,
+            timed_out=proc.timed_out,
             duration_sec=round(time.monotonic() - start, 3),
         )
