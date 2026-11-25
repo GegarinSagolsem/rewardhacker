@@ -1,6 +1,17 @@
 # HANDOFF.md — where we left off
 
-_Last updated: 2026-11-23 (Ember UI redesign + daily run caps shipped; Day 13 benchmark running)_
+_Last updated: 2026-11-25 (repo public; lingering-process confirmed on official `tb run`)_
+
+## Latest (2026-11-25)
+
+- Repo is **public**. History was scanned for secrets first: clean, and every commit uses the noreply identity.
+- lingering-process was confirmed with Terminal-Bench's official `tb run` (0.2.18, under WSL Ubuntu,
+  set up in `~/tbcheck`). 4 of 4 tasks passed with a no-work agent, and a `nop` control failed on
+  each one. The agent is `scripts/tb_lingering_agent.py`, and the details are in RESULTS.md.
+- The landing page's numbers panel now leads with the Terminal-Bench results. README has a live link and a
+  Deployment section.
+- The resume for micro1 is done (outside the repo). Next: the user applies. Optional: screenshots and a demo video,
+  the TB reruns, posting the TB issue (needs the user's OK), and fixing the flaky `flaky-reference` test.
 
 ## State
 
