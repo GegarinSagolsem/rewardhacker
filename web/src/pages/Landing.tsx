@@ -332,10 +332,10 @@ export default function Landing() {
         <section aria-label="Numbers" className="rounded-[28px] bg-surface-2 px-6 py-8 sm:px-10 sm:py-10">
           <dl className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-4">
             {[
-              ['12/12', 'LoopBench tasks classified correctly, live adversary included'],
-              ['9', 'probes: 8 static attacks plus an optional AI adversary'],
-              ['~$0.002', 'Gemini cost per adversary run, with per-run and daily caps'],
-              ['0', 'network access for probe containers, each thrown away after use'],
+              ['30/34', 'Terminal-Bench 1 tasks passable without doing the work (one harness flaw)'],
+              ['4/4', 'of those reproduced on the official tb run harness, against a do-nothing control'],
+              ['$0.06', 'AI adversary cost on 20 Terminal-Bench tasks; it found a task-specific shortcut'],
+              ['12/12', 'LoopBench regression tasks classified correctly, live adversary included'],
             ].map(([v, l]) => (
               <div key={v}>
                 <dt className="text-[34px] leading-none font-bold tracking-[-0.05em] tabular-nums sm:text-[48px]">{v}</dt>
@@ -344,8 +344,12 @@ export default function Landing() {
             ))}
           </dl>
           <p className="mt-8 border-t border-border pt-5 font-mono text-[10.5px] leading-relaxed text-subtle">
-            LoopBench is RewardHacker's own benchmark of known-answer tasks. It was written alongside the probes, so treat
-            its score as a regression test, not independent evidence.
+            Terminal-Bench numbers come from a 40-task sample (34 with results) and are preliminary; every caveat is in{' '}
+            <a href={`${REPO}/blob/main/RESULTS.md`} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-fg">
+              RESULTS.md
+            </a>
+            . LoopBench is RewardHacker's own set of known-answer tasks, written alongside the probes: a regression test, not
+            independent evidence.
           </p>
         </section>
 
