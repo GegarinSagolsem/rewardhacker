@@ -3,8 +3,10 @@
 **Red-team your rewards.** RewardHacker finds RL coding tasks whose reward can be obtained
 without doing the work — before an agent learns to do exactly that.
 
-> Status: early development. The core probing engine and CLI work; the web platform,
-> adversary agent and cloud deployment are in progress.
+**Live:** https://rewardhacker-289475076247.us-central1.run.app (API + dashboard on Google Cloud Run).
+
+> Status: working end to end: probing engine, CLI, LLM adversary, web platform, MCP server
+> and cloud deployment. The Terminal-Bench results below are preliminary.
 
 ## Why
 
@@ -161,6 +163,16 @@ Claude Code (`.mcp.json` in your project; see `examples/mcp/`):
   }
 }
 ```
+
+## Deployment
+
+The API and dashboard run on Google Cloud Run. Each run's probes execute in a Cloud Build job
+dispatched by the API. Pushing to `main` runs CI and then deploys an image tagged with the
+commit SHA. `/api/health` reports the live commit, and a failed health check rolls the deploy
+back. Postgres is Neon and MongoDB is Atlas. Exports go to Cloud Storage, and secrets live in
+Secret Manager. Spending is capped in several places: daily run limits per organization and for
+the whole service, a daily LLM budget, AI features that each organization has to be granted,
+and a billing kill switch. See `deploy/README.md` and `infra/billing-kill-switch/README.md`.
 
 ## License
 
