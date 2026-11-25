@@ -50,7 +50,9 @@ a static-probe report; the LLM adversary ran on 20). Full write-up with every ca
 - **30 tasks are exploitable, all through the same weakness.** The tests are copied into the
   agent's still-running container, so a background process the agent leaves behind can
   rewrite them before they run. That is a property of the harness, not of any one task, so it
-  is reported once, with a fix.
+  is reported once, with a fix. **Reproduced with Terminal-Bench's official `tb run`** on 4
+  tasks (easy to hard): an agent that does no work is marked as having solved each one, while a
+  do-nothing control fails.
 - **The LLM adversary found a task-specific shortcut in `form-filling`** (verified by hand): the
   tests check the output's shape but never its values, so hard-coded JSON passes. Cost of the
   whole 20-task adversary pass: $0.06.

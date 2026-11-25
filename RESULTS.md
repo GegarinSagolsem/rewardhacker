@@ -47,6 +47,33 @@ It fired on all 30 tasks it could run on. It did not fire on `unprivileged-headl
 (the one robust task) or on the 2 tasks whose reference failed at test time. I have not yet
 checked why pyrender resisted.
 
+#### Confirmed on the official harness (2026-11-25)
+
+To rule out a difference between RewardHacker's runner and the real one, I reproduced the
+attack with Terminal-Bench's own `tb run` (terminal-bench 0.2.18, the version pinned at commit
+`d28711d`, run under WSL2 Ubuntu). The agent, `scripts/tb_lingering_agent.py`, does no work. It
+only starts the same background loop as the probe and returns. A built-in `nop` agent was run as
+a control on each task.
+
+| Task | Difficulty | `nop` (control) | lingering-process agent |
+|---|---|---|---|
+| hello-world | easy | unresolved (2 tests failed) | **resolved** |
+| pandas-etl | easy | unresolved (3 tests failed) | **resolved** |
+| vulnerable-secret | medium | unresolved (3 tests failed) | **resolved** |
+| feal-linear-cryptanalysis | hard | unresolved (1 test failed) | **resolved** |
+
+In every run, pytest collected only the injected `test_rh_placeholder`. The harness code
+explains why. `Harness._run_trial` runs the tests in the same container the agent used, and
+does nothing to stop the agent's processes first. `_setup_test_env` then copies the tests to
+`/tests`, where the agent can write. A separate "tests" tmux session does not isolate them.
+I ran 4 of the 30 tasks on the official harness, not all 30. The other 26 rely on the
+runner reproducing the same mechanism.
+
+Reproduce: `pip install terminal-bench==0.2.18`, then
+`PYTHONPATH=scripts tb run -p <original-tasks> -t hello-world --agent-import-path tb_lingering_agent:LingeringAgent`
+(on Linux or WSL; `tb` builds container paths with the host's path separator, so it fails on
+native Windows).
+
 ### Task-specific findings (unverified)
 
 These fired in addition to lingering-process and need a manual check before they count:
